@@ -1,0 +1,51 @@
+{
+  "name": "nfl-pickem-challenge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Community NFL Pick 'Em Challenge - Free-to-play web application with Node.js backend, Next.js frontend, and shared types",
+  "author": "WeBeCodin",
+  "license": "MIT",
+  "keywords": ["nfl", "pickem", "sports", "challenge", "monorepo", "typescript", "nextjs", "express", "postgresql", "redis"],
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --workspace=packages/backend",
+    "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "test:watch": "npm run test:watch --workspaces",
+    "test:coverage": "npm run test:coverage --workspaces",
+    "lint": "npm run lint --workspaces",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:migrate": "npm run db:migrate --workspace=packages/backend",
+    "db:seed": "npm run db:seed --workspace=packages/backend",
+    "db:studio": "npm run db:studio --workspace=packages/backend",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^18.4.3",
+    "@commitlint/config-conventional": "^18.4.3",
+    "@types/node": "^20.10.5",
+    "concurrently": "^8.2.2",
+    "husky": "^8.0.3",
+    "prettier": "^3.1.1",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WeBeCodin/Project-Pick-EM.git"
+  },
+  "bugs": {
+    "url": "https://github.com/WeBeCodin/Project-Pick-EM/issues"
+  },
+  "homepage": "https://github.com/WeBeCodin/Project-Pick-EM#readme"
+}

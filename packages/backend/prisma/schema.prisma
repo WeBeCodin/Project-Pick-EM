@@ -1,0 +1,390 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum UserRole {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum GameStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  POSTPONED
+  CANCELLED
+}
+
+enum SeasonType {
+  PRESEASON
+  REGULAR
+  PLAYOFFS
+  SUPER_BOWL
+}
+
+enum PickType {
+  SPREAD
+  MONEYLINE
+  OVER_UNDER
+}
+
+enum LeagueStatus {
+  ACTIVE
+  INACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum LeagueType {
+  PUBLIC
+  PRIVATE
+  INVITE_ONLY
+}
+
+// =============================================================================
+// USER MANAGEMENT
+// =============================================================================
+
+model User {
+  id                String     @id @default(uuid()) @db.Uuid
+  email             String     @unique @db.VarChar(255)
+  username          String     @unique @db.VarChar(50)
+  firstName         String?    @db.VarChar(50)
+  lastName          String?    @db.VarChar(50)
+  displayName       String?    @db.VarChar(100)
+  avatar            String?    @db.VarChar(500)
+  passwordHash      String     @db.VarChar(255)
+  role              UserRole   @default(USER)
+  status            UserStatus @default(PENDING_VERIFICATION)
+  emailVerified     Boolean    @default(false)
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  deletedAt         DateTime?
+  
+  // Preferences
+  timezone          String?    @default("UTC") @db.VarChar(50)
+  preferences       Json?      @db.JsonB
+  
+  // Security
+  refreshTokens     RefreshToken[]
+  passwordResets    PasswordReset[]
+  emailVerifications EmailVerification[]
+  
+  // NFL Pick'em Relations
+  leagueMembers     LeagueMember[]
+  picks             Pick[]
+  leaguesOwned      League[]   @relation("LeagueOwner")
+  
+  // Audit
+  loginAttempts     LoginAttempt[]
+  auditLogs         AuditLog[]
+  
+  @@map("users")
+  @@index([email])
+  @@index([username])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  token     String   @unique @db.VarChar(500)
+  userId    String   @db.Uuid
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("refresh_tokens")
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique @db.VarChar(255)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("password_resets")
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+model EmailVerification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique @db.VarChar(255)
+  expiresAt DateTime
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("email_verifications")
+  @@index([userId])
+  @@index([token])
+}
+
+// =============================================================================
+// NFL DATA
+// =============================================================================
+
+model Season {
+  id          String     @id @default(uuid()) @db.Uuid
+  year        Int        @unique
+  type        SeasonType
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  weeks       Week[]
+  leagues     League[]
+  
+  @@map("seasons")
+  @@index([year])
+  @@index([isActive])
+}
+
+model Week {
+  id          String   @id @default(uuid()) @db.Uuid
+  seasonId    String   @db.Uuid
+  weekNumber  Int
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  season      Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  games       Game[]
+  
+  @@map("weeks")
+  @@unique([seasonId, weekNumber])
+  @@index([seasonId])
+  @@index([weekNumber])
+  @@index([isActive])
+}
+
+model Team {
+  id            String @id @default(uuid()) @db.Uuid
+  externalId    String @unique @db.VarChar(50) // NFL API ID
+  name          String @db.VarChar(100)
+  city          String @db.VarChar(100)
+  abbreviation  String @unique @db.VarChar(5)
+  conference    String @db.VarChar(3) // AFC, NFC
+  division      String @db.VarChar(10) // North, South, East, West
+  primaryColor  String? @db.VarChar(7)
+  secondaryColor String? @db.VarChar(7)
+  logo          String? @db.VarChar(500)
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  homeGames     Game[] @relation("HomeTeam")
+  awayGames     Game[] @relation("AwayTeam")
+  
+  @@map("teams")
+  @@index([conference, division])
+  @@index([abbreviation])
+}
+
+model Game {
+  id              String     @id @default(uuid()) @db.Uuid
+  externalId      String     @unique @db.VarChar(50) // NFL API ID
+  weekId          String     @db.Uuid
+  homeTeamId      String     @db.Uuid
+  awayTeamId      String     @db.Uuid
+  scheduledAt     DateTime
+  startedAt       DateTime?
+  completedAt     DateTime?
+  status          GameStatus @default(SCHEDULED)
+  
+  // Scores
+  homeScore       Int?
+  awayScore       Int?
+  homeScoreQ1     Int?
+  awayScoreQ1     Int?
+  homeScoreQ2     Int?
+  awayScoreQ2     Int?
+  homeScoreQ3     Int?
+  awayScoreQ3     Int?
+  homeScoreQ4     Int?
+  awayScoreQ4     Int?
+  homeScoreOT     Int?
+  awayScoreOT     Int?
+  
+  // Betting Lines
+  spread          Float?     // Home team spread
+  overUnder       Float?
+  
+  // Additional Data
+  weather         Json?      @db.JsonB
+  metadata        Json?      @db.JsonB
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  
+  week            Week       @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  homeTeam        Team       @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam        Team       @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  picks           Pick[]
+  
+  @@map("games")
+  @@index([weekId])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+// =============================================================================
+// LEAGUES AND PICKS
+// =============================================================================
+
+model League {
+  id            String       @id @default(uuid()) @db.Uuid
+  name          String       @db.VarChar(100)
+  description   String?      @db.Text
+  ownerId       String       @db.Uuid
+  seasonId      String       @db.Uuid
+  type          LeagueType   @default(PUBLIC)
+  status        LeagueStatus @default(ACTIVE)
+  maxMembers    Int?         @default(100)
+  inviteCode    String?      @unique @db.VarChar(20)
+  settings      Json?        @db.JsonB // Scoring rules, etc.
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  owner         User         @relation("LeagueOwner", fields: [ownerId], references: [id])
+  season        Season       @relation(fields: [seasonId], references: [id])
+  members       LeagueMember[]
+  
+  @@map("leagues")
+  @@index([ownerId])
+  @@index([seasonId])
+  @@index([type])
+  @@index([status])
+  @@index([inviteCode])
+}
+
+model LeagueMember {
+  id          String   @id @default(uuid()) @db.Uuid
+  leagueId    String   @db.Uuid
+  userId      String   @db.Uuid
+  joinedAt    DateTime @default(now())
+  isActive    Boolean  @default(true)
+  
+  league      League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("league_members")
+  @@unique([leagueId, userId])
+  @@index([leagueId])
+  @@index([userId])
+}
+
+model Pick {
+  id          String     @id @default(uuid()) @db.Uuid
+  userId      String     @db.Uuid
+  gameId      String     @db.Uuid
+  type        PickType   @default(SPREAD)
+  
+  // Pick Data
+  selectedTeamId String? @db.Uuid // For spread/moneyline picks
+  overUnder   String?    // "OVER" or "UNDER"
+  confidence  Int?       // 1-16 for confidence pools
+  
+  // Metadata
+  lockedAt    DateTime?  // When the pick was locked (game started)
+  isCorrect   Boolean?   // Determined after game completion
+  points      Int?       // Points awarded for this pick
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game        Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  
+  @@map("picks")
+  @@unique([userId, gameId, type])
+  @@index([userId])
+  @@index([gameId])
+  @@index([lockedAt])
+  @@index([isCorrect])
+}
+
+// =============================================================================
+// AUDIT AND LOGGING
+// =============================================================================
+
+model LoginAttempt {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @db.Uuid
+  email       String   @db.VarChar(255)
+  ipAddress   String   @db.VarChar(45)
+  userAgent   String?  @db.Text
+  success     Boolean
+  failureReason String? @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@map("login_attempts")
+  @@index([userId])
+  @@index([email])
+  @@index([ipAddress])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @db.Uuid
+  action      String   @db.VarChar(100)
+  resource    String   @db.VarChar(100)
+  resourceId  String?  @db.VarChar(255)
+  oldValues   Json?    @db.JsonB
+  newValues   Json?    @db.JsonB
+  ipAddress   String?  @db.VarChar(45)
+  userAgent   String?  @db.Text
+  createdAt   DateTime @default(now())
+  
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@map("audit_logs")
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+}
