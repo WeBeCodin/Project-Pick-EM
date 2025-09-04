@@ -3,7 +3,6 @@
  * Configuration and global setup for all tests
  */
 
-import 'reflect-metadata';
 import { config } from 'dotenv';
 
 // Load test environment variables

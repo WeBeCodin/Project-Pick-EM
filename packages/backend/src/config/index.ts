@@ -4,11 +4,9 @@
  */
 
 import { config as dotenvConfig } from 'dotenv';
-import { expand } from 'dotenv-expand';
 
 // Load environment variables
-const env = dotenvConfig();
-expand(env);
+dotenvConfig();
 
 interface Config {
   // Application
