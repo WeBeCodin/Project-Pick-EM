@@ -1,390 +1,628 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// packages/backend/prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
-  output   = "./generated/client"
+  previewFeatures = ["fullTextSearch", "postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  extensions = [uuid_ossp(map: "uuid-ossp"), pgcrypto]
 }
 
-// =============================================================================
-// ENUMS
-// =============================================================================
+// ==========================================
+// CORE USER & AUTHENTICATION MODELS
+// ==========================================
 
-enum UserRole {
-  USER
-  ADMIN
-  MODERATOR
+model User {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String           @unique @db.VarChar(255)
+  username          String           @unique @db.VarChar(50)
+  password          String           @db.VarChar(255) // bcrypt hash
+  displayName       String?          @db.VarChar(100)
+  avatarUrl         String?          @db.VarChar(500)
+  bio               String?          @db.Text
+  
+  // Account status
+  isActive          Boolean          @default(true)
+  emailVerified     Boolean          @default(false)
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  loginCount        Int              @default(0)
+  
+  // Metadata
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?        // Soft delete support
+  
+  // Relations
+  picks             Pick[]
+  weeklyResults     WeeklyResult[]
+  userLeagues       UserLeague[]
+  createdLeagues    League[]         @relation("LeagueCreator")
+  achievements      UserAchievement[]
+  refreshTokens     RefreshToken[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  messages          LeagueMessage[]
+  
+  @@index([email])
+  @@index([username])
+  @@index([isActive, emailVerified])
+  @@map("users")
 }
 
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-  PENDING_VERIFICATION
+model RefreshToken {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token       String   @unique @db.VarChar(500)
+  userId      String   @db.Uuid
+  family      String   @db.VarChar(100) // Token family for rotation detection
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  lastUsedAt  DateTime?
+  ipAddress   String?  @db.VarChar(45) // IPv6 compatible
+  userAgent   String?  @db.Text
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+  @@index([userId])
+  @@index([family])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ==========================================
+// NFL SEASON & GAME MODELS
+// ==========================================
+
+model Season {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  year        Int      @unique
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  isActive    Boolean  @default(false)
+  isCurrent   Boolean  @default(false) // Only one can be current
+  
+  // Season configuration
+  weeksCount  Int      @default(18) // Regular season weeks
+  playoffWeeks Int     @default(4)  // Playoff weeks
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  weeks       Week[]
+  leagues     League[]
+  
+  @@index([year])
+  @@index([isActive])
+  @@index([isCurrent])
+  @@map("seasons")
+}
+
+model Week {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  seasonId         String    @db.Uuid
+  weekNumber       Int       // 1-18 for regular season, 19+ for playoffs
+  weekType         WeekType  @default(REGULAR)
+  name             String?   @db.VarChar(100) // e.g., "Week 1", "Wild Card Round"
+  
+  // Important dates/times
+  startDate        DateTime  @db.Date
+  endDate          DateTime  @db.Date
+  pickDeadline     DateTime  // When picks lock
+  
+  // Tiebreaker configuration
+  tiebreakerGameId String?   @unique @db.Uuid
+  
+  // Status flags
+  isActive         Boolean   @default(false)
+  isComplete       Boolean   @default(false)
+  isScored         Boolean   @default(false) // Have scores been calculated
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations
+  season           Season    @relation(fields: [seasonId], references: [id])
+  games            Game[]
+  picks            Pick[]
+  weeklyResults    WeeklyResult[]
+  tiebreakerGame   Game?     @relation("TiebreakerGame")
+  
+  @@unique([seasonId, weekNumber])
+  @@index([seasonId])
+  @@index([isActive])
+  @@index([pickDeadline])
+  @@map("weeks")
+}
+
+enum WeekType {
+  PRESEASON
+  REGULAR
+  WILDCARD
+  DIVISIONAL
+  CONFERENCE
+  SUPERBOWL
+  PROBOWL
+}
+
+model Team {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  abbreviation     String   @unique @db.VarChar(5)  // e.g., "KC", "SF"
+  city             String   @db.VarChar(50)          // e.g., "Kansas City"
+  name             String   @db.VarChar(50)          // e.g., "Chiefs"
+  fullName         String   @db.VarChar(100)         // e.g., "Kansas City Chiefs"
+  
+  // Conference & Division
+  conference       Conference
+  division         Division
+  
+  // Branding
+  logoUrl          String?  @db.VarChar(500)
+  primaryColor     String?  @db.VarChar(7)  // Hex color
+  secondaryColor   String?  @db.VarChar(7)  // Hex color
+  
+  // External IDs for RSS mapping
+  espnId           String?  @db.VarChar(50)
+  cbsId            String?  @db.VarChar(50)
+  foxId            String?  @db.VarChar(50)
+  
+  // Stats (updated via RSS)
+  currentWins      Int      @default(0)
+  currentLosses    Int      @default(0)
+  currentTies      Int      @default(0)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  homeGames        Game[]   @relation("HomeTeam")
+  awayGames        Game[]   @relation("AwayTeam")
+  picks            Pick[]
+  
+  @@index([abbreviation])
+  @@index([conference, division])
+  @@map("teams")
+}
+
+enum Conference {
+  AFC
+  NFC
+}
+
+enum Division {
+  NORTH
+  SOUTH
+  EAST
+  WEST
+}
+
+model Game {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  weekId            String    @db.Uuid
+  
+  // Teams
+  homeTeamId        String    @db.Uuid
+  awayTeamId        String    @db.Uuid
+  
+  // Schedule
+  kickoffTime       DateTime
+  tvNetwork         String?   @db.VarChar(50) // ESPN, CBS, FOX, etc.
+  
+  // Scores
+  homeScore         Int?
+  awayScore         Int?
+  
+  // Game status
+  status            GameStatus @default(SCHEDULED)
+  quarter           String?   @db.VarChar(10) // "1", "2", "3", "4", "OT", "FINAL"
+  timeRemaining     String?   @db.VarChar(10) // "12:34"
+  possession        String?   @db.VarChar(5)  // Team abbreviation with ball
+  
+  // External IDs for RSS tracking
+  espnGameId        String?   @db.VarChar(100)
+  cbsGameId         String?   @db.VarChar(100)
+  foxGameId         String?   @db.VarChar(100)
+  
+  // Metadata
+  lastUpdatedFrom   String?   @db.VarChar(50) // Which RSS source last updated
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  week              Week      @relation(fields: [weekId], references: [id])
+  homeTeam          Team      @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam          Team      @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  picks             Pick[]
+  tiebreakerForWeek Week?     @relation("TiebreakerGame")
+  
+  @@unique([weekId, espnGameId])
+  @@unique([weekId, cbsGameId])
+  @@unique([weekId, foxGameId])
+  @@index([weekId])
+  @@index([kickoffTime])
+  @@index([status])
+  @@map("games")
 }
 
 enum GameStatus {
   SCHEDULED
   IN_PROGRESS
-  COMPLETED
+  HALFTIME
+  FINAL
+  FINAL_OT
   POSTPONED
   CANCELLED
 }
 
-enum SeasonType {
-  PRESEASON
-  REGULAR
-  PLAYOFFS
-  SUPER_BOWL
-}
-
-enum PickType {
-  SPREAD
-  MONEYLINE
-  OVER_UNDER
-}
-
-enum LeagueStatus {
-  ACTIVE
-  INACTIVE
-  COMPLETED
-  ARCHIVED
-}
-
-enum LeagueType {
-  PUBLIC
-  PRIVATE
-  INVITE_ONLY
-}
-
-// =============================================================================
-// USER MANAGEMENT
-// =============================================================================
-
-model User {
-  id                String     @id @default(uuid()) @db.Uuid
-  email             String     @unique @db.VarChar(255)
-  username          String     @unique @db.VarChar(50)
-  firstName         String?    @db.VarChar(50)
-  lastName          String?    @db.VarChar(50)
-  displayName       String?    @db.VarChar(100)
-  avatar            String?    @db.VarChar(500)
-  passwordHash      String     @db.VarChar(255)
-  role              UserRole   @default(USER)
-  status            UserStatus @default(PENDING_VERIFICATION)
-  emailVerified     Boolean    @default(false)
-  emailVerifiedAt   DateTime?
-  lastLoginAt       DateTime?
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  deletedAt         DateTime?
-  
-  // Preferences
-  timezone          String?    @default("UTC") @db.VarChar(50)
-  preferences       Json?      @db.JsonB
-  
-  // Security
-  refreshTokens     RefreshToken[]
-  passwordResets    PasswordReset[]
-  emailVerifications EmailVerification[]
-  
-  // NFL Pick'em Relations
-  leagueMembers     LeagueMember[]
-  picks             Pick[]
-  leaguesOwned      League[]   @relation("LeagueOwner")
-  
-  // Audit
-  loginAttempts     LoginAttempt[]
-  auditLogs         AuditLog[]
-  
-  @@map("users")
-  @@index([email])
-  @@index([username])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model RefreshToken {
-  id        String   @id @default(uuid()) @db.Uuid
-  token     String   @unique @db.VarChar(500)
-  userId    String   @db.Uuid
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  revokedAt DateTime?
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@map("refresh_tokens")
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-model PasswordReset {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  token     String   @unique @db.VarChar(255)
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@map("password_resets")
-  @@index([userId])
-  @@index([token])
-  @@index([expiresAt])
-}
-
-model EmailVerification {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  token     String   @unique @db.VarChar(255)
-  expiresAt DateTime
-  verifiedAt DateTime?
-  createdAt DateTime @default(now())
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@map("email_verifications")
-  @@index([userId])
-  @@index([token])
-}
-
-// =============================================================================
-// NFL DATA
-// =============================================================================
-
-model Season {
-  id          String     @id @default(uuid()) @db.Uuid
-  year        Int        @unique
-  type        SeasonType
-  startDate   DateTime
-  endDate     DateTime
-  isActive    Boolean    @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
-  weeks       Week[]
-  leagues     League[]
-  
-  @@map("seasons")
-  @@index([year])
-  @@index([isActive])
-}
-
-model Week {
-  id          String   @id @default(uuid()) @db.Uuid
-  seasonId    String   @db.Uuid
-  weekNumber  Int
-  startDate   DateTime
-  endDate     DateTime
-  isActive    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  season      Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  games       Game[]
-  
-  @@map("weeks")
-  @@unique([seasonId, weekNumber])
-  @@index([seasonId])
-  @@index([weekNumber])
-  @@index([isActive])
-}
-
-model Team {
-  id            String @id @default(uuid()) @db.Uuid
-  externalId    String @unique @db.VarChar(50) // NFL API ID
-  name          String @db.VarChar(100)
-  city          String @db.VarChar(100)
-  abbreviation  String @unique @db.VarChar(5)
-  conference    String @db.VarChar(3) // AFC, NFC
-  division      String @db.VarChar(10) // North, South, East, West
-  primaryColor  String? @db.VarChar(7)
-  secondaryColor String? @db.VarChar(7)
-  logo          String? @db.VarChar(500)
-  isActive      Boolean @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  homeGames     Game[] @relation("HomeTeam")
-  awayGames     Game[] @relation("AwayTeam")
-  
-  @@map("teams")
-  @@index([conference, division])
-  @@index([abbreviation])
-}
-
-model Game {
-  id              String     @id @default(uuid()) @db.Uuid
-  externalId      String     @unique @db.VarChar(50) // NFL API ID
-  weekId          String     @db.Uuid
-  homeTeamId      String     @db.Uuid
-  awayTeamId      String     @db.Uuid
-  scheduledAt     DateTime
-  startedAt       DateTime?
-  completedAt     DateTime?
-  status          GameStatus @default(SCHEDULED)
-  
-  // Scores
-  homeScore       Int?
-  awayScore       Int?
-  homeScoreQ1     Int?
-  awayScoreQ1     Int?
-  homeScoreQ2     Int?
-  awayScoreQ2     Int?
-  homeScoreQ3     Int?
-  awayScoreQ3     Int?
-  homeScoreQ4     Int?
-  awayScoreQ4     Int?
-  homeScoreOT     Int?
-  awayScoreOT     Int?
-  
-  // Betting Lines
-  spread          Float?     // Home team spread
-  overUnder       Float?
-  
-  // Additional Data
-  weather         Json?      @db.JsonB
-  metadata        Json?      @db.JsonB
-  
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  
-  week            Week       @relation(fields: [weekId], references: [id], onDelete: Cascade)
-  homeTeam        Team       @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam        Team       @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  picks           Pick[]
-  
-  @@map("games")
-  @@index([weekId])
-  @@index([homeTeamId])
-  @@index([awayTeamId])
-  @@index([scheduledAt])
-  @@index([status])
-}
-
-// =============================================================================
-// LEAGUES AND PICKS
-// =============================================================================
-
-model League {
-  id            String       @id @default(uuid()) @db.Uuid
-  name          String       @db.VarChar(100)
-  description   String?      @db.Text
-  ownerId       String       @db.Uuid
-  seasonId      String       @db.Uuid
-  type          LeagueType   @default(PUBLIC)
-  status        LeagueStatus @default(ACTIVE)
-  maxMembers    Int?         @default(100)
-  inviteCode    String?      @unique @db.VarChar(20)
-  settings      Json?        @db.JsonB // Scoring rules, etc.
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  
-  owner         User         @relation("LeagueOwner", fields: [ownerId], references: [id])
-  season        Season       @relation(fields: [seasonId], references: [id])
-  members       LeagueMember[]
-  
-  @@map("leagues")
-  @@index([ownerId])
-  @@index([seasonId])
-  @@index([type])
-  @@index([status])
-  @@index([inviteCode])
-}
-
-model LeagueMember {
-  id          String   @id @default(uuid()) @db.Uuid
-  leagueId    String   @db.Uuid
-  userId      String   @db.Uuid
-  joinedAt    DateTime @default(now())
-  isActive    Boolean  @default(true)
-  
-  league      League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@map("league_members")
-  @@unique([leagueId, userId])
-  @@index([leagueId])
-  @@index([userId])
-}
+// ==========================================
+// PICK & SCORING MODELS
+// ==========================================
 
 model Pick {
-  id          String     @id @default(uuid()) @db.Uuid
-  userId      String     @db.Uuid
-  gameId      String     @db.Uuid
-  type        PickType   @default(SPREAD)
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @db.Uuid
+  weekId            String    @db.Uuid
+  gameId            String    @db.Uuid
   
-  // Pick Data
-  selectedTeamId String? @db.Uuid // For spread/moneyline picks
-  overUnder   String?    // "OVER" or "UNDER"
-  confidence  Int?       // 1-16 for confidence pools
+  // Selection
+  selectedTeamId    String?   @db.Uuid // null = no pick yet
+  isHomeTeamPick    Boolean?  // Denormalized for faster queries
+  
+  // Scoring
+  isCorrect         Boolean?  // null until game complete
+  pointsAwarded     Int       @default(0)
+  
+  // Tiebreaker (only for designated tiebreaker games)
+  tiebreakerScore   Int?      // Total points prediction
+  tiebreakerDiff    Int?      // Absolute difference from actual
+  
+  // Timestamps
+  submittedAt       DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lockedAt          DateTime? // When the pick was locked (kickoff time)
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id])
+  week              Week      @relation(fields: [weekId], references: [id])
+  game              Game      @relation(fields: [gameId], references: [id])
+  selectedTeam      Team?     @relation(fields: [selectedTeamId], references: [id])
+  
+  @@unique([userId, gameId])
+  @@index([userId, weekId])
+  @@index([gameId])
+  @@index([isCorrect])
+  @@map("picks")
+}
+
+model WeeklyResult {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @db.Uuid
+  weekId            String    @db.Uuid
+  
+  // Scoring
+  correctPicks      Int       @default(0)
+  totalPicks        Int       @default(0)
+  points            Int       @default(0)
+  
+  // Ranking
+  weeklyRank        Int?      // Rank for this week
+  tiebreakerUsed    Boolean   @default(false)
+  
+  // Stats
+  accuracy          Float?    // Percentage correct
+  streak            Int       @default(0) // Current streak (+/- for win/loss)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id])
+  week              Week      @relation(fields: [weekId], references: [id])
+  
+  @@unique([userId, weekId])
+  @@index([weekId, points])
+  @@index([userId])
+  @@map("weekly_results")
+}
+
+// ==========================================
+// LEAGUE & SOCIAL MODELS
+// ==========================================
+
+model League {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  seasonId          String    @db.Uuid
+  
+  // League details
+  name              String    @db.VarChar(100)
+  description       String?   @db.Text
+  code              String    @unique @db.VarChar(10) // Invite code
+  
+  // Configuration
+  isPrivate         Boolean   @default(true)
+  maxMembers        Int?
+  allowLateJoin     Boolean   @default(true) // Can join after season starts
+  scoringSystem     ScoringSystem @default(STANDARD)
+  
+  // Creator
+  createdById       String    @db.Uuid
+  
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime? // Soft delete
+  
+  // Relations
+  season            Season    @relation(fields: [seasonId], references: [id])
+  creator           User      @relation("LeagueCreator", fields: [createdById], references: [id])
+  members           UserLeague[]
+  messages          LeagueMessage[]
+  
+  @@index([code])
+  @@index([seasonId])
+  @@index([createdById])
+  @@map("leagues")
+}
+
+enum ScoringSystem {
+  STANDARD      // 1 point per correct pick
+  CONFIDENCE    // Points based on confidence ranking
+  SPREAD        // Against the spread
+}
+
+model UserLeague {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @db.Uuid
+  leagueId          String    @db.Uuid
+  
+  // Role & Status
+  role              LeagueRole @default(MEMBER)
+  status            MemberStatus @default(ACTIVE)
+  
+  // Stats (denormalized for performance)
+  totalPoints       Int       @default(0)
+  totalCorrectPicks Int       @default(0)
+  currentRank       Int?
+  
+  // Timestamps
+  joinedAt          DateTime  @default(now())
+  lastActiveAt      DateTime  @default(now())
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id])
+  league            League    @relation(fields: [leagueId], references: [id])
+  
+  @@unique([userId, leagueId])
+  @@index([leagueId, totalPoints])
+  @@index([userId])
+  @@map("user_leagues")
+}
+
+enum LeagueRole {
+  OWNER
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+}
+
+model LeagueMessage {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  leagueId          String    @db.Uuid
+  userId            String    @db.Uuid
+  
+  message           String    @db.Text
+  isAnnouncement    Boolean   @default(false)
+  isPinned          Boolean   @default(false)
+  
+  createdAt         DateTime  @default(now())
+  editedAt          DateTime?
+  deletedAt         DateTime? // Soft delete
+  
+  // Relations
+  league            League    @relation(fields: [leagueId], references: [id])
+  user              User      @relation(fields: [userId], references: [id])
+  
+  @@index([leagueId, createdAt])
+  @@index([userId])
+  @@map("league_messages")
+}
+
+// ==========================================
+// GAMIFICATION & ENGAGEMENT MODELS
+// ==========================================
+
+model Achievement {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  
+  // Achievement details
+  name              String    @unique @db.VarChar(100)
+  description       String    @db.Text
+  category          AchievementCategory
+  
+  // Display
+  iconUrl           String?   @db.VarChar(500)
+  badgeColor        String?   @db.VarChar(7) // Hex color
+  
+  // Points & Rarity
+  points            Int       @default(0)
+  rarity            Rarity    @default(COMMON)
+  
+  // Criteria (stored as JSON for flexibility)
+  criteria          Json      // e.g., { "type": "streak", "value": 5 }
+  
+  // Flags
+  isActive          Boolean   @default(true)
+  isSecret          Boolean   @default(false) // Hidden until unlocked
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  users             UserAchievement[]
+  
+  @@index([category])
+  @@index([rarity])
+  @@map("achievements")
+}
+
+enum AchievementCategory {
+  ACCURACY      // High pick accuracy
+  STREAK        // Win streaks
+  PARTICIPATION // Consistent participation
+  PERFECT       // Perfect weeks
+  MILESTONE     // Total picks/wins milestones
+  SPECIAL       // Special events
+  SOCIAL        // League participation
+}
+
+enum Rarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+model UserAchievement {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @db.Uuid
+  achievementId     String    @db.Uuid
+  
+  unlockedAt        DateTime  @default(now())
+  progress          Int       @default(100) // Percentage for progressive achievements
+  metadata          Json?     // Additional context about the achievement
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id])
+  achievement       Achievement @relation(fields: [achievementId], references: [id])
+  
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([unlockedAt])
+  @@map("user_achievements")
+}
+
+model Notification {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @db.Uuid
+  
+  // Notification content
+  type              NotificationType
+  title             String    @db.VarChar(200)
+  message           String    @db.Text
+  actionUrl         String?   @db.VarChar(500)
+  
+  // Status
+  isRead            Boolean   @default(false)
+  readAt            DateTime?
   
   // Metadata
-  lockedAt    DateTime?  // When the pick was locked (game started)
-  isCorrect   Boolean?   // Determined after game completion
-  points      Int?       // Points awarded for this pick
+  metadata          Json?     // Additional context
+  priority          Priority  @default(NORMAL)
+  expiresAt         DateTime? // Auto-delete after this date
   
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt         DateTime  @default(now())
   
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  game        Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  // Relations
+  user              User      @relation(fields: [userId], references: [id])
   
-  @@map("picks")
-  @@unique([userId, gameId, type])
-  @@index([userId])
-  @@index([gameId])
-  @@index([lockedAt])
-  @@index([isCorrect])
-}
-
-// =============================================================================
-// AUDIT AND LOGGING
-// =============================================================================
-
-model LoginAttempt {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String?  @db.Uuid
-  email       String   @db.VarChar(255)
-  ipAddress   String   @db.VarChar(45)
-  userAgent   String?  @db.Text
-  success     Boolean
-  failureReason String? @db.VarChar(255)
-  createdAt   DateTime @default(now())
-  
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  
-  @@map("login_attempts")
-  @@index([userId])
-  @@index([email])
-  @@index([ipAddress])
+  @@index([userId, isRead])
   @@index([createdAt])
+  @@index([type])
+  @@map("notifications")
 }
+
+enum NotificationType {
+  PICK_REMINDER
+  ACHIEVEMENT_UNLOCKED
+  LEAGUE_INVITE
+  LEAGUE_MESSAGE
+  WEEK_RESULTS
+  GAME_UPDATE
+  SYSTEM_ANNOUNCEMENT
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// ==========================================
+// AUDIT & ANALYTICS MODELS
+// ==========================================
 
 model AuditLog {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String?  @db.Uuid
-  action      String   @db.VarChar(100)
-  resource    String   @db.VarChar(100)
-  resourceId  String?  @db.VarChar(255)
-  oldValues   Json?    @db.JsonB
-  newValues   Json?    @db.JsonB
-  ipAddress   String?  @db.VarChar(45)
-  userAgent   String?  @db.Text
-  createdAt   DateTime @default(now())
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String?   @db.Uuid // Null for system actions
   
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // Action details
+  action            String    @db.VarChar(100)
+  entity            String    @db.VarChar(50)
+  entityId          String?   @db.Uuid
   
-  @@map("audit_logs")
+  // Change tracking
+  oldValues         Json?
+  newValues         Json?
+  
+  // Request context
+  ipAddress         String?   @db.VarChar(45)
+  userAgent         String?   @db.Text
+  requestId         String?   @db.VarChar(100)
+  
+  createdAt         DateTime  @default(now())
+  
+  // Relations
+  user              User?     @relation(fields: [userId], references: [id])
+  
   @@index([userId])
-  @@index([action])
-  @@index([resource])
+  @@index([entity, entityId])
   @@index([createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// ==========================================
+// RSS FEED TRACKING
+// ==========================================
+
+model RssFeedLog {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  
+  // Feed details
+  source            String    @db.VarChar(50) // ESPN, CBS, FOX
+  feedUrl           String    @db.VarChar(500)
+  feedType          String    @db.VarChar(50) // schedule, scores, news
+  
+  // Fetch status
+  success           Boolean
+  errorMessage      String?   @db.Text
+  itemsProcessed    Int       @default(0)
+  itemsUpdated      Int       @default(0)
+  
+  // Timing
+  fetchStartedAt    DateTime
+  fetchCompletedAt  DateTime?
+  duration          Int?      // milliseconds
+  
+  // Response data
+  responseStatus    Int?
+  responseHeaders   Json?
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([source, createdAt])
+  @@index([success])
+  @@index([feedType])
+  @@map("rss_feed_logs")
 }
