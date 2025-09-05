@@ -30,6 +30,8 @@ model User {
   emailVerifiedAt   DateTime?
   lastLoginAt       DateTime?
   loginCount        Int              @default(0)
+  loginAttempts     Int              @default(0)  // Failed login attempts
+  lockedAt          DateTime?        // Account lockout timestamp
   
   // Metadata
   createdAt         DateTime         @default(now())
@@ -43,6 +45,7 @@ model User {
   createdLeagues    League[]         @relation("LeagueCreator")
   achievements      UserAchievement[]
   refreshTokens     RefreshToken[]
+  loginHistory      LoginAttempt[]   // Renamed to avoid conflict
   notifications     Notification[]
   auditLogs         AuditLog[]
   messages          LeagueMessage[]
@@ -59,6 +62,7 @@ model RefreshToken {
   userId      String   @db.Uuid
   family      String   @db.VarChar(100) // Token family for rotation detection
   expiresAt   DateTime
+  isRevoked   Boolean  @default(false) // For token revocation
   createdAt   DateTime @default(now())
   lastUsedAt  DateTime?
   ipAddress   String?  @db.VarChar(45) // IPv6 compatible
@@ -70,7 +74,26 @@ model RefreshToken {
   @@index([userId])
   @@index([family])
   @@index([expiresAt])
+  @@index([isRevoked])
   @@map("refresh_tokens")
+}
+
+model LoginAttempt {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String?  @db.Uuid // nullable for non-existent users
+  identifier  String   @db.VarChar(255) // email or username attempted
+  ipAddress   String   @db.VarChar(45)
+  userAgent   String?  @db.Text
+  success     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([identifier])
+  @@index([ipAddress])
+  @@index([createdAt])
+  @@map("login_attempts")
 }
 
 // ==========================================
