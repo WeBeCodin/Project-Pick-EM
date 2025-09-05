@@ -8,6 +8,8 @@ import { testDatabaseConnection } from './database';
 import { cacheService } from './services/cache/cache.service';
 import { startRSSCronJobs } from './services/rss/cron';
 import adminRoutes from './routes/admin.routes';
+import { pickRoutes } from './routes/pick.routes';
+import { errorHandler } from './utils/errors';
 
 const app = express();
 const PORT = config.PORT;
@@ -45,16 +47,10 @@ app.get('/health', async (_req, res) => {
 
 // API routes
 app.use('/api/admin', adminRoutes);
+app.use('/api/v1/picks', pickRoutes);
 
 // Error handling middleware
-app.use((error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  logger.error('Unhandled error:', error);
-  res.status(500).json({
-    success: false,
-    error: 'Internal server error',
-    details: config.NODE_ENV === 'development' ? error.message : undefined
-  });
-});
+app.use(errorHandler);
 
 // 404 handler
 app.use('*', (req, res) => {
