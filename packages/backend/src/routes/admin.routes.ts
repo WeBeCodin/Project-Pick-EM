@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { rssParserService } from '../services/rss/rss-parser.service';
 import { manualRSSSync, getRSSStatus } from '../services/rss/cron';
+import { MockNFLService } from '../services/rss/mock-nfl.service';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -207,6 +208,25 @@ router.get('/cache/stats', async (_req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to get cache stats',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Create mock NFL Week 1 games for demo
+router.post('/nfl/create-week1', async (_req, res) => {
+  try {
+    logger.info('Admin request: Creating Week 1 NFL games');
+    await MockNFLService.createWeek1Games();
+    res.json({ 
+      success: true, 
+      message: 'Week 1 NFL games created successfully' 
+    });
+  } catch (error) {
+    logger.error('Error creating Week 1 games:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create Week 1 games',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }

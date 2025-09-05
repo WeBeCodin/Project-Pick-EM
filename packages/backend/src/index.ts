@@ -9,6 +9,7 @@ import { cacheService } from './services/cache/cache.service';
 import { startRSSCronJobs } from './services/rss/cron';
 import adminRoutes from './routes/admin.routes';
 import { pickRoutes } from './routes/pick.routes';
+import { authRoutes } from './routes/auth.routes';
 import { errorHandler } from './utils/errors';
 
 const app = express();
@@ -48,6 +49,7 @@ app.get('/health', async (_req, res) => {
 // API routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/v1/picks', pickRoutes);
+app.use('/auth', authRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
