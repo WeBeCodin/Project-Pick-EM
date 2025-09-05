@@ -48,6 +48,11 @@ interface Config {
   EMAIL_HOST: string;
   EMAIL_PORT: number;
   EMAIL_USER?: string;
+
+  // RSS Configuration
+  RSS_SCHEDULE_CACHE_TTL: number;
+  RSS_SCORES_CACHE_TTL: number;
+  RSS_ENABLE_CRON: boolean;
   EMAIL_PASSWORD?: string;
   EMAIL_FROM: string;
   EMAIL_PROVIDER: string;
@@ -190,6 +195,11 @@ export const config: Config = {
   DEBUG: process.env.DEBUG,
   PRISMA_DEBUG: getEnvAsBoolean('PRISMA_DEBUG', false),
   ENABLE_QUERY_LOGGING: getEnvAsBoolean('ENABLE_QUERY_LOGGING', true),
+
+  // RSS Configuration
+  RSS_SCHEDULE_CACHE_TTL: getEnvAsNumber('RSS_SCHEDULE_CACHE_TTL', 900), // 15 minutes
+  RSS_SCORES_CACHE_TTL: getEnvAsNumber('RSS_SCORES_CACHE_TTL', 60), // 1 minute  
+  RSS_ENABLE_CRON: getEnvAsBoolean('RSS_ENABLE_CRON', true),
 };
 
 // Validate critical configuration

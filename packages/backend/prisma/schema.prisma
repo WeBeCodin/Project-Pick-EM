@@ -129,7 +129,7 @@ model Week {
   games            Game[]
   picks            Pick[]
   weeklyResults    WeeklyResult[]
-  tiebreakerGame   Game?     @relation("TiebreakerGame")
+  tiebreakerGame   Game?     @relation("TiebreakerGame", fields: [tiebreakerGameId], references: [id])
   
   @@unique([seasonId, weekNumber])
   @@index([seasonId])
