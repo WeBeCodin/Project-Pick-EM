@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { User, Trophy, Calendar, LogOut, Menu } from 'lucide-react';
+import { User, Trophy, Calendar, LogOut, Menu, Users } from 'lucide-react';
 import { useState } from 'react';
 
 export function Header() {
@@ -30,6 +30,13 @@ export function Header() {
               >
                 <Calendar className="h-4 w-4" />
                 <span>Make Picks</span>
+              </Link>
+              <Link
+                href={"/leagues" as any}
+                className="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <Users className="h-4 w-4" />
+                <span>Leagues</span>
               </Link>
               <Link
                 href={"/leaderboard" as any}
@@ -99,6 +106,14 @@ export function Header() {
               >
                 <Calendar className="h-4 w-4" />
                 <span>Make Picks</span>
+              </Link>
+              <Link
+                href={"/leagues" as any}
+                className="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Users className="h-4 w-4" />
+                <span>Leagues</span>
               </Link>
               <Link
                 href={"/leaderboard" as any}
