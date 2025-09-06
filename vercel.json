@@ -1,6 +1,14 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "packages/frontend/.next",
+  "functions": {
+    "packages/frontend/app/api/**/*.ts": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "buildCommand": "cd packages/frontend && npm install && npx prisma generate && npm run build",
+  "outputDirectory": "packages/frontend/.next", 
   "framework": "nextjs",
-  "installCommand": "npm install && cd packages/frontend && npm install"
+  "installCommand": "cd packages/frontend && npm install",
+  "env": {
+    "SKIP_ENV_VALIDATION": "true"
+  }
 }
