@@ -13,7 +13,7 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm run dev --workspace=packages/backend",
     "dev:frontend": "npm run dev --workspace=packages/frontend",
-    "build": "npm run build --workspaces",
+    "build": "cd packages/frontend && npx prisma generate && npm run build",
     "test": "npm run test --workspaces",
     "test:watch": "npm run test:watch --workspaces",
     "test:coverage": "npm run test:coverage --workspaces",
@@ -25,7 +25,7 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "prepare": "husky install"
+    "postinstall": "husky install || true"
   },
   "devDependencies": {
     "@commitlint/cli": "^18.4.3",
