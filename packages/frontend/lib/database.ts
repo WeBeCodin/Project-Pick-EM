@@ -1,5 +1,5 @@
 // Database client for frontend API routes
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../prisma/generated/client';
 
 // Global database instance for frontend
 declare global {
