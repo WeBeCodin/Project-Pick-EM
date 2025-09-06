@@ -9,6 +9,11 @@ declare global {
 // Use a global variable to prevent multiple Prisma instances in development
 const prisma = globalThis.__prisma || new PrismaClient({
   log: ['error', 'warn'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL || 'postgresql://placeholder:placeholder@localhost:5432/placeholder'
+    }
+  }
 });
 
 if (process.env.NODE_ENV !== 'production') {
