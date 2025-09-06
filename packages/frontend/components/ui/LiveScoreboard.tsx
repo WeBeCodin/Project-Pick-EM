@@ -35,6 +35,11 @@ interface LiveScoreboardProps {
    * @default false
    */
   enablePicks?: boolean;
+
+  /**
+   * Callback when a pick is submitted successfully
+   */
+  onPickSubmitted?: () => void;
 }
 
 /**
@@ -47,7 +52,8 @@ export function LiveScoreboard({
   liveOnly = false, 
   compact = false,
   maxGames,
-  enablePicks = false
+  enablePicks = false,
+  onPickSubmitted
 }: LiveScoreboardProps) {
   const { games, isLoading, error, lastUpdated, isPolling, refresh } = useLiveScores({
     interval,
@@ -106,6 +112,9 @@ export function LiveScoreboard({
           ...prev,
           [gameId]: { selectedTeam, confidence }
         }));
+        
+        // Call the callback to update parent component
+        onPickSubmitted?.();
       } else {
         throw new Error('Failed to submit pick');
       }
