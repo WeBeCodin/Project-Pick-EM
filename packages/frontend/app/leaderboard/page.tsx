@@ -27,12 +27,8 @@ export default function LeaderboardPage() {
     return null;
   }
 
-  // Mock leaderboard data
-  const leaderboardData = [
-    { rank: 1, username: 'FootballFan123', displayName: 'John Smith', wins: 0, losses: 0, percentage: 0, points: 0 },
-    { rank: 2, username: 'PickMaster', displayName: 'Sarah Johnson', wins: 0, losses: 0, percentage: 0, points: 0 },
-    { rank: 3, username: 'NFLGuru', displayName: 'Mike Davis', wins: 0, losses: 0, percentage: 0, points: 0 },
-  ];
+  // Mock leaderboard data - empty for new season
+  const leaderboardData: any[] = [];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

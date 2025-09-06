@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const week = searchParams.get('week') || '1';
+    // Make this route static by defaulting to week 1
+    const week = '1';
 
     // Real 2025 NFL Week 1 schedule (from official NFL/ESPN data)
     const realNFLGames = [

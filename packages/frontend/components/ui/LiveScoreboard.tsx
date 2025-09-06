@@ -64,11 +64,36 @@ export function LiveScoreboard({
   const [isPickModalOpen, setIsPickModalOpen] = useState(false);
   const [userPicks, setUserPicks] = useState<Record<string, { selectedTeam: 'home' | 'away'; confidence: number }>>({});
 
-  // Load existing picks on component mount
+  // Load existing picks on component mount and when page becomes visible
   React.useEffect(() => {
     if (enablePicks) {
       loadUserPicks();
     }
+  }, [enablePicks]);
+
+  // Reload picks when the page becomes visible (user returns to tab/page)
+  React.useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && enablePicks) {
+        console.log('🔄 Page became visible, reloading picks...');
+        loadUserPicks();
+      }
+    };
+
+    const handleFocus = () => {
+      if (enablePicks) {
+        console.log('🔄 Window focused, reloading picks...');
+        loadUserPicks();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [enablePicks]);
 
   const loadUserPicks = async () => {
