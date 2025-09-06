@@ -1,14 +1,11 @@
 {
   "functions": {
     "packages/frontend/app/api/**/*.ts": {
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@1.0.0"
     }
   },
   "buildCommand": "cd packages/frontend && npm install && npx prisma generate && npm run build",
   "outputDirectory": "packages/frontend/.next", 
   "framework": "nextjs",
-  "installCommand": "cd packages/frontend && npm install",
-  "env": {
-    "SKIP_ENV_VALIDATION": "true"
-  }
+  "installCommand": "cd packages/frontend && npm install"
 }
