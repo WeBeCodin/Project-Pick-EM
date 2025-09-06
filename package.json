@@ -13,7 +13,7 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm run dev --workspace=packages/backend",
     "dev:frontend": "npm run dev --workspace=packages/frontend",
-    "build": "cd packages/frontend && npx prisma generate && npm run build",
+    "build": "cd packages/frontend && npm install @prisma/client@^5.22.0 && npx prisma generate && npm run build",
     "test": "npm run test --workspaces",
     "test:watch": "npm run test:watch --workspaces",
     "test:coverage": "npm run test:coverage --workspaces",
