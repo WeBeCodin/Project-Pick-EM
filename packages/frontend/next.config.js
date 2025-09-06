@@ -1,13 +1,15 @@
+import path from 'path';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
     typedRoutes: true,
   },
-  webpack: (config) => {
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // Handle module resolution for absolute imports
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': require('path').resolve(__dirname),
+      '@': path.resolve(process.cwd()),
     };
     return config;
   },
