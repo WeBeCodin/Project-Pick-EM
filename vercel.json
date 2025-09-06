@@ -1,9 +1,4 @@
 {
-  "functions": {
-    "packages/frontend/app/api/**/*.ts": {
-      "runtime": "@vercel/node@1.0.0"
-    }
-  },
   "buildCommand": "cd packages/frontend && npm install && npx prisma generate && npm run build",
   "outputDirectory": "packages/frontend/.next", 
   "framework": "nextjs",
