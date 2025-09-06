@@ -69,15 +69,17 @@ export function LiveScoreboard({
     try {
       const response = await fetch('/api/picks');
       if (response.ok) {
-        const picks = await response.json();
-        const picksMap = picks.reduce((acc: any, pick: any) => {
-          acc[pick.gameId] = {
-            selectedTeam: pick.selectedTeam,
-            confidence: pick.confidence
-          };
-          return acc;
-        }, {});
-        setUserPicks(picksMap);
+        const result = await response.json();
+        if (result.success && result.data && result.data.picks) {
+          const picksMap = result.data.picks.reduce((acc: any, pick: any) => {
+            acc[pick.gameId] = {
+              selectedTeam: pick.selectedTeam,
+              confidence: pick.confidence
+            };
+            return acc;
+          }, {});
+          setUserPicks(picksMap);
+        }
       }
     } catch (error) {
       console.error('Error loading picks:', error);

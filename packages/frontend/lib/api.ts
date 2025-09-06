@@ -1,10 +1,9 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '' : 'http://localhost:3002');
+// For Next.js API routes, use relative URLs (no baseURL needed)
 const API_TIMEOUT = parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || '30000');
 
 export const api = axios.create({
-  baseURL: API_URL,
   timeout: API_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',

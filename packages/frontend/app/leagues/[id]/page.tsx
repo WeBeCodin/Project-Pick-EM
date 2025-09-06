@@ -111,7 +111,7 @@ export default function LeagueDetailPage() {
       setError(null);
 
       // Load league details
-      const leagueResponse = await fetch(`/api/leagues?id=${leagueId}`);
+      const leagueResponse = await fetch(`/api/leagues?action=single&leagueId=${leagueId}`);
       const leagueData = await leagueResponse.json();
       
       if (leagueData.success) {

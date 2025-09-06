@@ -101,7 +101,7 @@ let mockLeagues: League[] = [
     settings: {
       maxMembers: 50,
       isPrivate: true,
-      requireApproval: true,
+      requireApproval: false,
       scoringSystem: 'standard',
       weeklyPayout: false,
       seasonPayout: true,
