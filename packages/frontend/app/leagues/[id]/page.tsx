@@ -82,7 +82,7 @@ interface LeagueStanding {
 }
 
 export default function LeagueDetailPage() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const params = useParams();
   const leagueId = params.id as string;
@@ -210,7 +210,7 @@ export default function LeagueDetailPage() {
     );
   }
 
-  const isOwner = league.ownerId === 'user-1';
+  const isOwner = league.ownerId === (user?.id || 'anonymous');
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -399,7 +399,7 @@ export default function LeagueDetailPage() {
                         <div className="flex items-center">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {standing.username}
-                            {standing.userId === 'user-1' && (
+                            {standing.userId === (user?.id || 'anonymous') && (
                               <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                                 You
                               </span>
@@ -455,7 +455,7 @@ export default function LeagueDetailPage() {
                       <div>
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
                           {member.username}
-                          {member.userId === 'user-1' && (
+                          {member.userId === (user?.id || 'anonymous') && (
                             <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                               You
                             </span>

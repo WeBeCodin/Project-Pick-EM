@@ -23,62 +23,6 @@ interface LeagueStanding {
   trend: 'up' | 'down' | 'same';
 }
 
-// Mock standings data
-const generateMockStandings = (_leagueId: string): LeagueStanding[] => {
-  const baseStandings: LeagueStanding[] = [
-    {
-      userId: 'user-1',
-      username: 'johnsmith',
-      totalScore: 0,
-      weeklyScores: [],
-      stats: {
-        averageScore: 0,
-        bestWeek: 0,
-        worstWeek: 0,
-        consistency: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-      },
-      rank: 1,
-      trend: 'same',
-    },
-    {
-      userId: 'user-2',
-      username: 'sarahjones',
-      totalScore: 0,
-      weeklyScores: [],
-      stats: {
-        averageScore: 0,
-        bestWeek: 0,
-        worstWeek: 0,
-        consistency: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-      },
-      rank: 2,
-      trend: 'same',
-    },
-    {
-      userId: 'user-3',
-      username: 'mikebrown',
-      totalScore: 0,
-      weeklyScores: [],
-      stats: {
-        averageScore: 0,
-        bestWeek: 0,
-        worstWeek: 0,
-        consistency: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-      },
-      rank: 3,
-      trend: 'same',
-    },
-  ];
-
-  return baseStandings;
-};
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -92,16 +36,46 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const standings = generateMockStandings(leagueId);
+    // Get league members first
+    const leagueResponse = await fetch(`${request.nextUrl.origin}/api/leagues?id=${leagueId}`);
+    const leagueData = await leagueResponse.json();
+    
+    if (!leagueData.success) {
+      return NextResponse.json({
+        success: false,
+        error: 'League not found',
+      }, { status: 404 });
+    }
+
+    const league = leagueData.data;
+    const activeMembers = league.members.filter((member: any) => member.status === 'active');
+
+    // Generate standings only for actual league members
+    const standings = activeMembers.map((member: any, index: number): LeagueStanding => ({
+      userId: member.userId,
+      username: member.username,
+      totalScore: 0, // Will be calculated from actual picks in real implementation
+      weeklyScores: [],
+      stats: {
+        averageScore: 0,
+        bestWeek: 0,
+        worstWeek: 0,
+        consistency: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+      },
+      rank: index + 1,
+      trend: 'same' as const,
+    }));
 
     if (week) {
       // Return standings for specific week
       const weekNum = parseInt(week);
-      const weeklyStandings = standings.map(standing => ({
+      const weeklyStandings = standings.map((standing: LeagueStanding) => ({
         ...standing,
-        score: standing.weeklyScores.find(w => w.week === weekNum)?.score || 0,
-        correctPicks: standing.weeklyScores.find(w => w.week === weekNum)?.correctPicks || 0,
-        totalPicks: standing.weeklyScores.find(w => w.week === weekNum)?.totalPicks || 0,
+        score: standing.weeklyScores.find((w: any) => w.week === weekNum)?.score || 0,
+        correctPicks: standing.weeklyScores.find((w: any) => w.week === weekNum)?.correctPicks || 0,
+        totalPicks: standing.weeklyScores.find((w: any) => w.week === weekNum)?.totalPicks || 0,
       }));
 
       return NextResponse.json({

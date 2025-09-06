@@ -58,7 +58,7 @@ interface League {
 }
 
 export default function LeaguesPage() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'my-leagues' | 'public' | 'create'>('my-leagues');
   const [myLeagues, setMyLeagues] = useState<League[]>([]);
@@ -66,6 +66,7 @@ export default function LeaguesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
   // Create League Form State
   const [createForm, setCreateForm] = useState({
@@ -97,7 +98,7 @@ export default function LeaguesPage() {
       setError(null);
 
       if (activeTab === 'my-leagues') {
-        const response = await fetch('/api/leagues?action=my-leagues&userId=user-1');
+        const response = await fetch(`/api/leagues?action=my-leagues&userId=${user?.id || 'anonymous'}`);
         const data = await response.json();
         
         if (data.success) {
@@ -106,7 +107,7 @@ export default function LeaguesPage() {
           setError(data.error);
         }
       } else if (activeTab === 'public') {
-        const response = await fetch('/api/leagues?action=public&userId=user-1');
+        const response = await fetch(`/api/leagues?action=public&userId=${user?.id || 'anonymous'}`);
         const data = await response.json();
         
         if (data.success) {
@@ -145,7 +146,10 @@ export default function LeaguesPage() {
             weeklyPayout: createForm.weeklyPayout,
             seasonPayout: createForm.seasonPayout,
           },
-          ownerId: 'user-1',
+          ownerData: {
+            userId: user?.id || 'anonymous',
+            username: user?.username || 'Unknown User',
+          },
         }),
       });
 
@@ -188,8 +192,10 @@ export default function LeaguesPage() {
         body: JSON.stringify({
           leagueId,
           action: 'join',
-          userId: 'user-1',
-          username: 'currentuser',
+          userData: {
+            userId: user?.id || 'anonymous',
+            username: user?.username || 'Unknown User',
+          },
         }),
       });
 
@@ -214,6 +220,13 @@ export default function LeaguesPage() {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const copyInviteLink = (leagueId: string) => {
+    const inviteLink = `${window.location.origin}/leagues/join/${leagueId}`;
+    navigator.clipboard.writeText(inviteLink);
+    setCopiedLink(leagueId);
+    setTimeout(() => setCopiedLink(null), 2000);
   };
 
   if (isLoading && !isAuthenticated) {
@@ -303,9 +316,11 @@ export default function LeaguesPage() {
                   <LeagueCard
                     key={league.id}
                     league={league}
-                    isOwner={league.ownerId === 'user-1'}
+                    isOwner={league.ownerId === (user?.id || 'anonymous')}
                     onCopyCode={copyInviteCode}
+                    onCopyLink={copyInviteLink}
                     copiedCode={copiedCode}
+                    copiedLink={copiedLink}
                     showJoinButton={false}
                   />
                 ))}
@@ -525,12 +540,14 @@ interface LeagueCardProps {
   league: League;
   isOwner: boolean;
   onCopyCode?: (code: string) => void;
+  onCopyLink?: (leagueId: string) => void;
   onJoin?: () => void;
   copiedCode?: string | null;
+  copiedLink?: string | null;
   showJoinButton: boolean;
 }
 
-function LeagueCard({ league, isOwner, onCopyCode, onJoin, copiedCode, showJoinButton }: LeagueCardProps) {
+function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, copiedCode, copiedLink, showJoinButton }: LeagueCardProps) {
   const router = useRouter();
 
   const getScoringSystemLabel = (system: string) => {
@@ -600,11 +617,12 @@ function LeagueCard({ league, isOwner, onCopyCode, onJoin, copiedCode, showJoinB
           </div>
         </div>
 
-        {/* Invite Code */}
+        {/* Invite Code & Link */}
         {!showJoinButton && (
-          <div className="mb-4">
+          <div className="mb-4 space-y-3">
+            {/* Invite Code */}
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Invite Code:</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400 min-w-fit">Invite Code:</span>
               <code className="flex-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-mono">
                 {league.inviteCode}
               </code>
@@ -619,6 +637,27 @@ function LeagueCard({ league, isOwner, onCopyCode, onJoin, copiedCode, showJoinB
                   <Copy className="h-4 w-4 text-gray-500" />
                 )}
               </button>
+            </div>
+            
+            {/* Invite Link */}
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400 min-w-fit">Invite Link:</span>
+              <button
+                onClick={() => onCopyLink?.(league.id)}
+                className="flex-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm text-left hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                title="Copy invite link"
+              >
+                <span className="text-blue-600 dark:text-blue-400 truncate block">
+                  {typeof window !== 'undefined' ? `${window.location.origin}/leagues/join/${league.id}` : `/leagues/join/${league.id}`}
+                </span>
+              </button>
+              <div className="p-1">
+                {copiedLink === league.id ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4 text-gray-500" />
+                )}
+              </div>
             </div>
           </div>
         )}

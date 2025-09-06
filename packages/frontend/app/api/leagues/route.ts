@@ -162,6 +162,30 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    if (action === 'single') {
+      // Get specific league by ID
+      const leagueId = searchParams.get('leagueId');
+      if (!leagueId) {
+        return NextResponse.json({
+          success: false,
+          error: 'League ID is required',
+        }, { status: 400 });
+      }
+
+      const league = mockLeagues.find(l => l.id === leagueId);
+      if (!league) {
+        return NextResponse.json({
+          success: false,
+          error: 'League not found',
+        }, { status: 404 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: league,
+      });
+    }
+
     // Get specific league by ID
     const leagueId = searchParams.get('id');
     if (leagueId) {
@@ -197,13 +221,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, description, settings, ownerId = 'user-1' } = body;
+    const { name, description, settings, ownerData } = body;
 
     // Validate required fields
-    if (!name || !description) {
+    if (!name || !description || !ownerData) {
       return NextResponse.json({
         success: false,
-        error: 'Name and description are required',
+        error: 'Name, description, and user data are required',
       }, { status: 400 });
     }
 
@@ -215,8 +239,8 @@ export async function POST(request: NextRequest) {
       id: `league-${Date.now()}`,
       name,
       description,
-      ownerId,
-      ownerName: 'Current User', // In real app, fetch from user service
+      ownerId: ownerData.userId,
+      ownerName: ownerData.username,
       settings: {
         maxMembers: settings?.maxMembers || 20,
         isPrivate: settings?.isPrivate || false,
@@ -227,8 +251,8 @@ export async function POST(request: NextRequest) {
       },
       members: [
         {
-          userId: ownerId,
-          username: 'currentuser',
+          userId: ownerData.userId,
+          username: ownerData.username,
           joinedAt: new Date().toISOString(),
           role: 'owner',
           status: 'active',
@@ -238,8 +262,8 @@ export async function POST(request: NextRequest) {
         totalMembers: 1,
         weeklyWinners: [],
         seasonLeader: {
-          userId: ownerId,
-          username: 'currentuser',
+          userId: ownerData.userId,
+          username: ownerData.username,
           totalScore: 0,
         },
       },
@@ -282,10 +306,17 @@ export async function PUT(request: NextRequest) {
 
     switch (action) {
       case 'join':
-        const { userId = 'user-1', username = 'newuser' } = data;
+        const { userData } = data;
+        
+        if (!userData || !userData.userId || !userData.username) {
+          return NextResponse.json({
+            success: false,
+            error: 'User data is required',
+          }, { status: 400 });
+        }
         
         // Check if already a member
-        if (league.members.some(m => m.userId === userId)) {
+        if (league.members.some(m => m.userId === userData.userId)) {
           return NextResponse.json({
             success: false,
             error: 'Already a member of this league',
@@ -302,8 +333,8 @@ export async function PUT(request: NextRequest) {
 
         // Add member
         league.members.push({
-          userId,
-          username,
+          userId: userData.userId,
+          username: userData.username,
           joinedAt: new Date().toISOString(),
           role: 'member',
           status: league.settings.requireApproval ? 'pending' : 'active',
@@ -321,17 +352,24 @@ export async function PUT(request: NextRequest) {
         });
 
       case 'leave':
-        const { userId: leavingUserId = 'user-1' } = data;
+        const { userData: leavingUserData } = data;
+        
+        if (!leavingUserData || !leavingUserData.userId) {
+          return NextResponse.json({
+            success: false,
+            error: 'User data is required',
+          }, { status: 400 });
+        }
         
         // Don't allow owner to leave
-        if (league.ownerId === leavingUserId) {
+        if (league.ownerId === leavingUserData.userId) {
           return NextResponse.json({
             success: false,
             error: 'League owner cannot leave. Transfer ownership first.',
           }, { status: 400 });
         }
 
-        league.members = league.members.filter(m => m.userId !== leavingUserId);
+        league.members = league.members.filter(m => m.userId !== leavingUserData.userId);
         league.stats.totalMembers = league.members.filter(m => m.status === 'active').length;
         league.updatedAt = new Date().toISOString();
 
