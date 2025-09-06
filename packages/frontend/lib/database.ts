@@ -1,35 +1,24 @@
 // Database client for frontend API routes
-import { PrismaClient } from '@prisma/client';
+let PrismaClient: any;
+let prisma: any = null;
 
-// Global database instance for frontend
-declare global {
-  var __prisma: PrismaClient | undefined;
-}
-
-// Fallback for when no database is available (build time)
-let prisma: PrismaClient;
-
-try {
-  // Use a global variable to prevent multiple Prisma instances in development
-  prisma = globalThis.__prisma || new PrismaClient({
-    log: ['error', 'warn'],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL || 'postgresql://placeholder:placeholder@localhost:5432/placeholder'
-      }
+// Dynamic import to avoid build-time dependency
+async function getPrismaClient() {
+  if (!prisma && process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('placeholder')) {
+    try {
+      const { PrismaClient: PC } = await import('@prisma/client');
+      PrismaClient = PC;
+      prisma = new PC({
+        log: ['error', 'warn'],
+      });
+      console.log('✅ Database client initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize database client:', error);
+      return null;
     }
-  });
-
-  if (process.env.NODE_ENV !== 'production') {
-    globalThis.__prisma = prisma;
   }
-} catch (error) {
-  console.warn('Database not available during build, using fallback');
-  // Create a mock client for build time
-  prisma = {} as PrismaClient;
+  return prisma;
 }
-
-export { prisma };
 
 // Database service functions
 export class DatabaseService {
