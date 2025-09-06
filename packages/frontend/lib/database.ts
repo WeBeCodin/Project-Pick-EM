@@ -6,18 +6,27 @@ declare global {
   var __prisma: PrismaClient | undefined;
 }
 
-// Use a global variable to prevent multiple Prisma instances in development
-const prisma = globalThis.__prisma || new PrismaClient({
-  log: ['error', 'warn'],
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL || 'postgresql://placeholder:placeholder@localhost:5432/placeholder'
-    }
-  }
-});
+// Fallback for when no database is available (build time)
+let prisma: PrismaClient;
 
-if (process.env.NODE_ENV !== 'production') {
-  globalThis.__prisma = prisma;
+try {
+  // Use a global variable to prevent multiple Prisma instances in development
+  prisma = globalThis.__prisma || new PrismaClient({
+    log: ['error', 'warn'],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL || 'postgresql://placeholder:placeholder@localhost:5432/placeholder'
+      }
+    }
+  });
+
+  if (process.env.NODE_ENV !== 'production') {
+    globalThis.__prisma = prisma;
+  }
+} catch (error) {
+  console.warn('Database not available during build, using fallback');
+  // Create a mock client for build time
+  prisma = {} as PrismaClient;
 }
 
 export { prisma };
