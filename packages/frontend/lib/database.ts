@@ -325,4 +325,138 @@ export class DatabaseService {
     
     return currentWeek;
   }
+
+  static async getOrCreateDefaultGames() {
+    console.log('🏈 Getting or creating default games for current week');
+    
+    // Get current week
+    const currentWeek = await this.getOrCreateCurrentWeek();
+    if (!currentWeek) {
+      console.error('❌ No current week available');
+      return [];
+    }
+
+    // Check if games exist for this week
+    const existingGames = await prisma.game.findMany({
+      where: { weekId: currentWeek.id },
+      include: {
+        homeTeam: true,
+        awayTeam: true
+      }
+    });
+
+    if (existingGames.length > 0) {
+      console.log(`✅ Found ${existingGames.length} existing games for week`);
+      return existingGames;
+    }
+
+    // Get or create teams
+    const teams = await this.getOrCreateDefaultTeams();
+    if (teams.length < 2) {
+      console.error('❌ Not enough teams to create games');
+      return [];
+    }
+
+    // Create sample games for the week
+    const gameDate = new Date();
+    gameDate.setHours(gameDate.getHours() + 2); // Games start in 2 hours
+
+    const gamesToCreate = [
+      {
+        homeTeamId: teams[0].id, // Tampa Bay
+        awayTeamId: teams[1].id, // Atlanta
+        kickoffTime: new Date(gameDate),
+        tvNetwork: 'FOX'
+      },
+      {
+        homeTeamId: teams[2].id, // Miami
+        awayTeamId: teams[3].id, // Las Vegas
+        kickoffTime: new Date(gameDate.getTime() + 3 * 60 * 60 * 1000), // 3 hours later
+        tvNetwork: 'CBS'
+      }
+    ];
+
+    const createdGames = [];
+    for (const gameData of gamesToCreate) {
+      try {
+        const game = await prisma.game.create({
+          data: {
+            ...gameData,
+            weekId: currentWeek.id,
+            status: 'SCHEDULED'
+          },
+          include: {
+            homeTeam: true,
+            awayTeam: true
+          }
+        });
+        createdGames.push(game);
+      } catch (error) {
+        console.error('Error creating game:', error);
+      }
+    }
+
+    console.log(`✅ Created ${createdGames.length} games for current week`);
+    return createdGames;
+  }
+
+  static async getOrCreateDefaultTeams() {
+    console.log('🏈 Getting or creating default NFL teams');
+    
+    const existingTeams = await prisma.team.findMany();
+    if (existingTeams.length > 0) {
+      return existingTeams;
+    }
+
+    // Create sample NFL teams
+    const teamsToCreate = [
+      { 
+        name: 'Buccaneers', 
+        fullName: 'Tampa Bay Buccaneers',
+        abbreviation: 'TB', 
+        city: 'Tampa Bay', 
+        conference: 'NFC' as const, 
+        division: 'SOUTH' as const
+      },
+      { 
+        name: 'Falcons', 
+        fullName: 'Atlanta Falcons',
+        abbreviation: 'ATL', 
+        city: 'Atlanta', 
+        conference: 'NFC' as const, 
+        division: 'SOUTH' as const
+      },
+      { 
+        name: 'Dolphins', 
+        fullName: 'Miami Dolphins',
+        abbreviation: 'MIA', 
+        city: 'Miami', 
+        conference: 'AFC' as const, 
+        division: 'EAST' as const
+      },
+      { 
+        name: 'Raiders', 
+        fullName: 'Las Vegas Raiders',
+        abbreviation: 'LV', 
+        city: 'Las Vegas', 
+        conference: 'AFC' as const, 
+        division: 'WEST' as const
+      }
+    ];
+
+    const createdTeams = [];
+    for (const teamData of teamsToCreate) {
+      try {
+        const team = await prisma.team.create({
+          data: teamData
+        });
+        createdTeams.push(team);
+      } catch (error) {
+        console.error('Error creating team:', error);
+      }
+    }
+
+    console.log(`✅ Created ${createdTeams.length} teams`);
+    return createdTeams;
+  }
 }

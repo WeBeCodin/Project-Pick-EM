@@ -186,6 +186,15 @@ interface League {
     }
   };
 
+  const handleViewLeague = async (leagueId: string) => {
+    try {
+      // For now, just switch to my-leagues tab where they can see the league
+      setActiveTab('my-leagues');
+    } catch (err) {
+      console.error('Error viewing league:', err);
+    }
+  };
+
   const copyInviteCode = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
@@ -328,15 +337,19 @@ interface League {
               </div>
             ) : publicLeagues.length > 0 ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {publicLeagues.map((league) => (
-                  <LeagueCard
-                    key={league.id}
-                    league={league}
-                    isOwner={false}
-                    onJoin={() => handleJoinLeague(league.id)}
-                    showJoinButton={true}
-                  />
-                ))}
+                {publicLeagues.map((league) => {
+                  const isAlreadyMember = league.members?.some(member => member.userId === (user?.id || 'anonymous'));
+                  return (
+                    <LeagueCard
+                      key={league.id}
+                      league={league}
+                      isOwner={false}
+                      onJoin={() => handleJoinLeague(league.id)}
+                      onView={() => handleViewLeague(league.id)}
+                      showJoinButton={!isAlreadyMember}
+                    />
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-12">
@@ -476,12 +489,13 @@ interface LeagueCardProps {
   onCopyCode?: (code: string) => void;
   onCopyLink?: (leagueId: string) => void;
   onJoin?: () => void;
+  onView?: () => void;
   copiedCode?: string | null;
   copiedLink?: string | null;
   showJoinButton: boolean;
 }
 
-function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, copiedCode, copiedLink, showJoinButton }: LeagueCardProps) {
+function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, onView, copiedCode, copiedLink, showJoinButton }: LeagueCardProps) {
   const router = useRouter();
 
   const getScoringSystemLabel = (system: string) => {
@@ -610,7 +624,7 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, copiedCod
           ) : (
             <div className="space-y-2">
               <Button
-                onClick={() => router.push(`/leagues/${league.id}` as any)}
+                onClick={onView || (() => router.push(`/leagues/${league.id}` as any))}
                 className="w-full"
                 size="sm"
               >
