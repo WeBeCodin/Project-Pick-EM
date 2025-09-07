@@ -14,10 +14,11 @@ export async function GET(request: NextRequest) {
     });
 
     if (action === 'my-leagues') {
-      // Get leagues where user is a member
+      // Get leagues where user is a member OR creator
       const leagues = await DatabaseService.getLeagues();
       const userLeagues = leagues.filter((league: any) =>
-        league.members.some((member: any) => member.user.username === userId)
+        league.members.some((member: any) => member.user.username === userId) ||
+        league.creator?.username === userId
       );
       
       return NextResponse.json({
@@ -27,11 +28,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (action === 'public') {
-      // Get public leagues that user can join
+      // Get public leagues that user can join (exclude leagues user owns or is member of)
       const allLeagues = await DatabaseService.getLeagues();
       const publicLeagues = allLeagues.filter((league: any) =>
         !league.isPrivate &&
         !league.members.some((member: any) => member.user.username === userId) &&
+        league.creator?.username !== userId &&
         (!league.maxMembers || league.members.length < league.maxMembers)
       );
       

@@ -24,14 +24,10 @@ interface League {
   description: string;
   ownerId: string;
   ownerName: string;
-  settings: {
-    maxMembers: number;
-    isPrivate: boolean;
-    requireApproval: boolean;
-    scoringSystem: 'standard' | 'confidence' | 'spread';
-    weeklyPayout: boolean;
-    seasonPayout: boolean;
-  };
+  isPrivate: boolean;
+  maxMembers?: number;
+  allowLateJoin: boolean;
+  scoringSystem: 'STANDARD' | 'CONFIDENCE' | 'SPREAD';
   members: Array<{
     userId: string;
     username: string;
@@ -39,21 +35,7 @@ interface League {
     role: 'owner' | 'admin' | 'member';
     status: 'active' | 'pending' | 'removed';
   }>;
-  stats: {
-    totalMembers: number;
-    weeklyWinners: Array<{
-      week: number;
-      winnerId: string;
-      winnerName: string;
-      score: number;
-    }>;
-    seasonLeader: {
-      userId: string;
-      username: string;
-      totalScore: number;
-    };
-  };
-  inviteCode: string;
+  code: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -250,7 +232,7 @@ export default function LeagueDetailPage() {
                 {league.description}
               </p>
               <p className="text-sm text-gray-500">
-                Created by {league.ownerName} • Invite Code: <code className="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">{league.inviteCode}</code>
+                Created by {league.ownerName} • Invite Code: <code className="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">{league.code}</code>
               </p>
             </div>
           </div>
@@ -266,7 +248,7 @@ export default function LeagueDetailPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Members</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {league.stats.totalMembers}/{league.settings.maxMembers}
+                  {league.members?.length || 0}/{league.maxMembers || '∞'}
                 </p>
               </div>
             </div>
@@ -280,7 +262,7 @@ export default function LeagueDetailPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Leader</p>
                 <p className="text-lg font-bold text-gray-900 dark:text-white">
-                  {league.stats.seasonLeader.username}
+                  {league.members?.[0]?.username || 'TBD'}
                 </p>
               </div>
             </div>
@@ -306,8 +288,8 @@ export default function LeagueDetailPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Scoring</p>
                 <p className="text-sm font-bold text-gray-900 dark:text-white">
-                  {league.settings.scoringSystem === 'confidence' ? 'Confidence' : 
-                   league.settings.scoringSystem === 'standard' ? 'Standard' : 'Spread'}
+                  {league.scoringSystem === 'CONFIDENCE' ? 'Confidence' :
+                   league.scoringSystem === 'STANDARD' ? 'Standard' : 'Spread'}
                 </p>
               </div>
             </div>
@@ -338,7 +320,7 @@ export default function LeagueDetailPage() {
                 }`}
               >
                 <Users className="h-4 w-4 inline-block mr-2" />
-                Members ({league.stats.totalMembers})
+                Members ({league.members?.length || 0})
               </button>
               <button
                 onClick={() => setActiveTab('history')}
@@ -489,35 +471,10 @@ export default function LeagueDetailPage() {
               </h2>
             </div>
             <div className="p-6">
-              {league.stats.weeklyWinners.length > 0 ? (
-                <div className="space-y-4">
-                  {league.stats.weeklyWinners.map((winner) => (
-                    <div key={winner.week} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          Week {winner.week} Winner
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {winner.winnerName}
-                        </div>
-                      </div>
-                      <div className="text-lg font-bold text-gray-900 dark:text-white">
-                        {winner.score} pts
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-                    No weekly winners yet
-                  </h3>
-                  <p className="mt-2 text-gray-600 dark:text-gray-400">
-                    Weekly winners will appear here as the season progresses.
-                  </p>
-                </div>
-              )}
+              <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Weekly winners will appear here once the season starts</p>
+              </div>
             </div>
           </div>
         )}

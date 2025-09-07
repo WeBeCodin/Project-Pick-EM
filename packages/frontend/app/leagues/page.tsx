@@ -23,14 +23,10 @@ interface League {
   description: string;
   ownerId: string;
   ownerName: string;
-  settings: {
-    maxMembers: number;
-    isPrivate: boolean;
-    requireApproval: boolean;
-    scoringSystem: 'standard' | 'confidence' | 'spread';
-    weeklyPayout: boolean;
-    seasonPayout: boolean;
-  };
+  isPrivate: boolean;
+  maxMembers?: number;
+  allowLateJoin: boolean;
+  scoringSystem: 'STANDARD' | 'CONFIDENCE' | 'SPREAD';
   members: Array<{
     userId: string;
     username: string;
@@ -38,26 +34,9 @@ interface League {
     role: 'owner' | 'admin' | 'member';
     status: 'active' | 'pending' | 'removed';
   }>;
-  stats: {
-    totalMembers: number;
-    weeklyWinners: Array<{
-      week: number;
-      winnerId: string;
-      winnerName: string;
-      score: number;
-    }>;
-    seasonLeader: {
-      userId: string;
-      username: string;
-      totalScore: number;
-    };
-  };
-  inviteCode: string;
   createdAt: string;
-  updatedAt: string;
-}
-
-export default function LeaguesPage() {
+  code: string;
+}export default function LeaguesPage() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'my-leagues' | 'public' | 'create'>('my-leagues');
@@ -74,10 +53,7 @@ export default function LeaguesPage() {
     description: '',
     maxMembers: 20,
     isPrivate: false,
-    requireApproval: false,
-    scoringSystem: 'confidence' as const,
-    weeklyPayout: false,
-    seasonPayout: true,
+    scoringSystem: 'STANDARD' as const,
   });
 
   useEffect(() => {
@@ -141,10 +117,7 @@ export default function LeaguesPage() {
           settings: {
             maxMembers: createForm.maxMembers,
             isPrivate: createForm.isPrivate,
-            requireApproval: createForm.requireApproval,
             scoringSystem: createForm.scoringSystem,
-            weeklyPayout: createForm.weeklyPayout,
-            seasonPayout: createForm.seasonPayout,
           },
           ownerData: {
             userId: user?.id || 'anonymous',
@@ -162,10 +135,7 @@ export default function LeaguesPage() {
           description: '',
           maxMembers: 20,
           isPrivate: false,
-          requireApproval: false,
-          scoringSystem: 'confidence',
-          weeklyPayout: false,
-          seasonPayout: true,
+          scoringSystem: 'STANDARD',
         });
         
         // Switch to my leagues and reload
@@ -455,9 +425,9 @@ export default function LeaguesPage() {
                         onChange={(e) => setCreateForm({ ...createForm, scoringSystem: e.target.value as any })}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                       >
-                        <option value="confidence">Confidence Points</option>
-                        <option value="standard">Standard (1 point per win)</option>
-                        <option value="spread">Against the Spread</option>
+                        <option value="CONFIDENCE">Confidence Points</option>
+                        <option value="STANDARD">Standard (1 point per win)</option>
+                        <option value="SPREAD">Against the Spread</option>
                       </select>
                     </div>
                   </div>
@@ -473,42 +443,6 @@ export default function LeaguesPage() {
                       />
                       <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                         Private League (invite only)
-                      </span>
-                    </label>
-                    
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={createForm.requireApproval}
-                        onChange={(e) => setCreateForm({ ...createForm, requireApproval: e.target.checked })}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                        Require approval for new members
-                      </span>
-                    </label>
-                    
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={createForm.weeklyPayout}
-                        onChange={(e) => setCreateForm({ ...createForm, weeklyPayout: e.target.checked })}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                        Weekly payouts
-                      </span>
-                    </label>
-                    
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={createForm.seasonPayout}
-                        onChange={(e) => setCreateForm({ ...createForm, seasonPayout: e.target.checked })}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                        Season-end payout
                       </span>
                     </label>
                   </div>
@@ -552,9 +486,9 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, copiedCod
 
   const getScoringSystemLabel = (system: string) => {
     switch (system) {
-      case 'confidence': return 'Confidence Points';
-      case 'standard': return 'Standard';
-      case 'spread': return 'Against Spread';
+      case 'CONFIDENCE': return 'Confidence Points';
+      case 'STANDARD': return 'Standard';
+      case 'SPREAD': return 'Against Spread';
       default: return system;
     }
   };
@@ -570,7 +504,7 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, copiedCod
                 {league.name}
               </h3>
               {isOwner && <Crown className="h-4 w-4 text-yellow-500" />}
-              {league.settings.isPrivate && <Lock className="h-4 w-4 text-gray-500" />}
+              {league.isPrivate && <Lock className="h-4 w-4 text-gray-500" />}
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
               {league.description}
@@ -585,7 +519,7 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, copiedCod
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {league.stats.totalMembers}
+              {league.members?.length || 0}
             </div>
             <div className="text-xs text-gray-500">
               Members
@@ -593,7 +527,7 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, copiedCod
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {league.settings.maxMembers}
+              {league.maxMembers || 'Unlimited'}
             </div>
             <div className="text-xs text-gray-500">
               Max
@@ -606,13 +540,13 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, copiedCod
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600 dark:text-gray-400">Scoring:</span>
             <span className="font-medium text-gray-900 dark:text-white">
-              {getScoringSystemLabel(league.settings.scoringSystem)}
+              {getScoringSystemLabel(league.scoringSystem)}
             </span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600 dark:text-gray-400">Type:</span>
             <span className="font-medium text-gray-900 dark:text-white">
-              {league.settings.isPrivate ? 'Private' : 'Public'}
+              {league.isPrivate ? 'Private' : 'Public'}
             </span>
           </div>
         </div>
@@ -624,14 +558,14 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, copiedCod
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600 dark:text-gray-400 min-w-fit">Invite Code:</span>
               <code className="flex-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-mono">
-                {league.inviteCode}
+                {league.code}
               </code>
               <button
-                onClick={() => onCopyCode?.(league.inviteCode)}
+                onClick={() => onCopyCode?.(league.code)}
                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                 title="Copy invite code"
               >
-                {copiedCode === league.inviteCode ? (
+                {copiedCode === league.code ? (
                   <Check className="h-4 w-4 text-green-500" />
                 ) : (
                   <Copy className="h-4 w-4 text-gray-500" />

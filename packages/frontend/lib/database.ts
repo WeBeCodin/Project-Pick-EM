@@ -1,5 +1,5 @@
 // Database client for frontend API routes
-import { PrismaClient } from '../prisma/generated/client';
+import { PrismaClient } from '@prisma/client';
 
 // Global database instance for frontend
 declare global {
@@ -281,5 +281,48 @@ export class DatabaseService {
         season: true
       }
     });
+  }
+
+  static async getCurrentWeek() {
+    console.log('📅 Getting current active week from database');
+    return await prisma.week.findFirst({
+      where: {
+        isActive: true
+      },
+      orderBy: {
+        startDate: 'asc'
+      }
+    });
+  }
+
+  static async getOrCreateCurrentWeek() {
+    console.log('📅 Getting or creating current week');
+    
+    // Try to get current active week
+    let currentWeek = await this.getCurrentWeek();
+    
+    if (!currentWeek) {
+      // Get current season
+      const currentSeason = await this.getCurrentSeason();
+      
+      if (currentSeason) {
+        // Create Week 1 for the current season
+        currentWeek = await prisma.week.create({
+          data: {
+            seasonId: currentSeason.id,
+            weekNumber: 1,
+            weekType: 'REGULAR',
+            name: 'Week 1',
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
+            pickDeadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+            isActive: true
+          }
+        });
+        console.log('✅ Created new Week 1 for season:', currentSeason.year);
+      }
+    }
+    
+    return currentWeek;
   }
 }

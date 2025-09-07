@@ -20,19 +20,18 @@ interface League {
   description: string;
   ownerId: string;
   ownerName: string;
-  settings: {
-    maxMembers: number;
-    isPrivate: boolean;
-    requireApproval: boolean;
-    scoringSystem: 'standard' | 'confidence' | 'spread';
-    weeklyPayout: boolean;
-    seasonPayout: boolean;
-  };
-  stats: {
-    totalMembers: number;
-    activeMembers: number;
-  };
-  inviteCode: string;
+  isPrivate: boolean;
+  maxMembers?: number;
+  allowLateJoin: boolean;
+  scoringSystem: 'STANDARD' | 'CONFIDENCE' | 'SPREAD';
+  members: Array<{
+    userId: string;
+    username: string;
+    joinedAt: string;
+    role: 'owner' | 'admin' | 'member';
+    status: 'active' | 'pending' | 'removed';
+  }>;
+  code: string;
   createdAt: string;
 }
 
@@ -123,9 +122,9 @@ export default function JoinLeaguePage() {
 
   const getScoringSystemLabel = (system: string) => {
     switch (system) {
-      case 'confidence': return 'Confidence Points';
-      case 'standard': return 'Standard';
-      case 'spread': return 'Against Spread';
+      case 'CONFIDENCE': return 'Confidence Points';
+      case 'STANDARD': return 'Standard';
+      case 'SPREAD': return 'Against Spread';
       default: return system;
     }
   };
@@ -223,8 +222,8 @@ export default function JoinLeaguePage() {
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                     {league.name}
                   </h2>
-                  {league.settings.isPrivate && <Lock className="h-5 w-5 text-gray-500" />}
-                  {!league.settings.isPrivate && <Globe className="h-5 w-5 text-green-500" />}
+                  {league.isPrivate && <Lock className="h-5 w-5 text-gray-500" />}
+                  {!league.isPrivate && <Globe className="h-5 w-5 text-green-500" />}
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 mb-2">
                   {league.description}
@@ -239,7 +238,7 @@ export default function JoinLeaguePage() {
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {league.stats.totalMembers}
+                  {league.members?.length || 0}
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   Current Members
@@ -247,7 +246,7 @@ export default function JoinLeaguePage() {
               </div>
               <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {league.settings.maxMembers}
+                  {league.maxMembers || 'Unlimited'}
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   Max Members
@@ -262,19 +261,19 @@ export default function JoinLeaguePage() {
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Scoring System:</span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {getScoringSystemLabel(league.settings.scoringSystem)}
+                    {getScoringSystemLabel(league.scoringSystem)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded">
                   <span className="text-sm text-gray-600 dark:text-gray-400">League Type:</span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {league.settings.isPrivate ? 'Private (Invite Only)' : 'Public'}
+                    {league.isPrivate ? 'Private (Invite Only)' : 'Public'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Approval Required:</span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {league.settings.requireApproval ? 'Yes' : 'No'}
+                    {'No'}
                   </span>
                 </div>
               </div>
@@ -292,7 +291,7 @@ export default function JoinLeaguePage() {
 
             {/* Join Action */}
             <div className="space-y-4">
-              {league.stats.totalMembers >= league.settings.maxMembers ? (
+              {league.maxMembers && league.members && league.members.length >= league.maxMembers ? (
                 <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <Users className="mx-auto h-8 w-8 text-yellow-500 mb-2" />
                   <p className="text-yellow-700 dark:text-yellow-400 font-medium">
