@@ -618,11 +618,11 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, onView, c
             </div>
             
             {/* Invite Link */}
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400 min-w-fit">Invite Link:</span>
+            <div className="flex items-center space-x-2 min-w-0">
+              <span className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Invite Link:</span>
               <button
                 onClick={() => onCopyLink?.(league.id)}
-                className="flex-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm text-left hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="flex-1 min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm text-left hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 title="Copy invite link"
               >
                 <span className="text-blue-600 dark:text-blue-400 truncate block">
