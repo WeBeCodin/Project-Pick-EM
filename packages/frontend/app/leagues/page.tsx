@@ -43,6 +43,7 @@ interface League {
   const [myLeagues, setMyLeagues] = useState<League[]>([]);
   const [publicLeagues, setPublicLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
@@ -78,7 +79,7 @@ interface League {
         const data = await response.json();
         
         if (data.success) {
-          setMyLeagues(data.data);
+          setMyLeagues(data.data.leagues || []);
         } else {
           setError(data.error);
         }
@@ -87,7 +88,7 @@ interface League {
         const data = await response.json();
         
         if (data.success) {
-          setPublicLeagues(data.data);
+          setPublicLeagues(data.data.leagues || []);
         } else {
           setError(data.error);
         }
@@ -104,7 +105,8 @@ interface League {
     e.preventDefault();
     
     try {
-      setLoading(true);
+      setActionLoading(true);
+      setError(null);
       
       const response = await fetch('/api/leagues', {
         method: 'POST',
@@ -138,22 +140,36 @@ interface League {
           scoringSystem: 'STANDARD',
         });
         
-        // Switch to my leagues and reload
+        // Switch to my leagues and reload explicitly
         setActiveTab('my-leagues');
-        loadLeagues();
+        
+        // Force reload my leagues regardless of current tab state
+        const myLeaguesResponse = await fetch(`/api/leagues?action=my-leagues&userId=${user?.id || 'anonymous'}`);
+        const myLeaguesData = await myLeaguesResponse.json();
+        
+        if (myLeaguesData.success) {
+          setMyLeagues(myLeaguesData.data.leagues || []);
+          // Clear any previous errors since we succeeded
+          setError(null);
+        }
+        
+        console.log('✅ League created successfully!', data.data);
       } else {
-        setError(data.error);
+        setError(data.error || 'Failed to create league');
       }
     } catch (err) {
       setError('Failed to create league');
       console.error('Error creating league:', err);
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
   const handleJoinLeague = async (leagueId: string) => {
     try {
+      setActionLoading(true);
+      setError(null);
+      
       const response = await fetch('/api/leagues', {
         method: 'PUT',
         headers: {
@@ -172,17 +188,28 @@ interface League {
       const data = await response.json();
       
       if (data.success) {
-        // Reload leagues
-        loadLeagues();
-        if (activeTab !== 'my-leagues') {
-          setActiveTab('my-leagues');
+        // Reload leagues explicitly
+        setActiveTab('my-leagues');
+        
+        // Force reload my leagues regardless of current tab state  
+        const myLeaguesResponse = await fetch(`/api/leagues?action=my-leagues&userId=${user?.id || 'anonymous'}`);
+        const myLeaguesData = await myLeaguesResponse.json();
+        
+        if (myLeaguesData.success) {
+          setMyLeagues(myLeaguesData.data.leagues || []);
+          // Clear any previous errors since we succeeded
+          setError(null);
         }
+        
+        console.log('✅ Joined league successfully!', data.data);
       } else {
-        setError(data.error);
+        setError(data.error || 'Failed to join league');
       }
     } catch (err) {
       setError('Failed to join league');
       console.error('Error joining league:', err);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -301,6 +328,7 @@ interface League {
                     copiedCode={copiedCode}
                     copiedLink={copiedLink}
                     showJoinButton={false}
+                    actionLoading={actionLoading}
                   />
                 ))}
               </div>
@@ -347,6 +375,7 @@ interface League {
                       onJoin={() => handleJoinLeague(league.id)}
                       onView={() => handleViewLeague(league.id)}
                       showJoinButton={!isAlreadyMember}
+                      actionLoading={actionLoading}
                     />
                   );
                 })}
@@ -470,8 +499,8 @@ interface League {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? 'Creating...' : 'Create League'}
+                  <Button type="submit" disabled={actionLoading}>
+                    {actionLoading ? 'Creating...' : 'Create League'}
                   </Button>
                 </div>
               </form>
@@ -493,9 +522,10 @@ interface LeagueCardProps {
   copiedCode?: string | null;
   copiedLink?: string | null;
   showJoinButton: boolean;
+  actionLoading?: boolean;
 }
 
-function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, onView, copiedCode, copiedLink, showJoinButton }: LeagueCardProps) {
+function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, onView, copiedCode, copiedLink, showJoinButton, actionLoading }: LeagueCardProps) {
   const router = useRouter();
 
   const getScoringSystemLabel = (system: string) => {
@@ -617,9 +647,10 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, onView, c
               onClick={onJoin}
               className="w-full"
               size="sm"
+              disabled={actionLoading}
             >
               <UserPlus className="h-4 w-4 mr-2" />
-              Join League
+              {actionLoading ? 'Joining...' : 'Join League'}
             </Button>
           ) : (
             <div className="space-y-2">

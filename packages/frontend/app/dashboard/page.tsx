@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { Trophy, TrendingUp, Users } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Target } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import LiveScoreboard from '@/components/ui/LiveScoreboard';
@@ -16,6 +16,13 @@ export default function DashboardPage() {
     weekRecord: '0-0',
     winRate: 0
   });
+  
+  const [leagueStats, setLeagueStats] = useState({
+    totalLeagues: 0,
+    loading: true
+  });
+  const [currentLeague, setCurrentLeague] = useState<any>(null);
+  const [userLeagues, setUserLeagues] = useState<any[]>([]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -26,6 +33,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (isAuthenticated) {
       loadPickStats();
+      loadLeagueStats();
     }
   }, [isAuthenticated]);
 
@@ -59,6 +67,39 @@ export default function DashboardPage() {
       
     } catch (error) {
       console.error('Error loading pick stats:', error);
+    }
+  };
+
+    const loadLeagueStats = async () => {
+    try {
+      // Load user leagues
+      const response = await fetch('/api/leagues?action=my-leagues');
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        const leagues = data.data.leagues || [];
+        setUserLeagues(leagues);
+        setLeagueStats({
+          totalLeagues: leagues.length,
+          loading: false
+        });
+        
+        // Set first league as current if none selected
+        if (leagues.length > 0 && !currentLeague) {
+          setCurrentLeague(leagues[0]);
+        }
+      } else {
+        setLeagueStats({
+          totalLeagues: 0,
+          loading: false
+        });
+      }
+    } catch (error) {
+      console.error('Error loading league stats:', error);
+      setLeagueStats({
+        totalLeagues: 0,
+        loading: false
+      });
     }
   };
 
@@ -133,7 +174,9 @@ export default function DashboardPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Leagues</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">3</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {leagueStats.loading ? '...' : leagueStats.totalLeagues}
+              </p>
             </div>
           </div>
         </div>
@@ -151,18 +194,121 @@ export default function DashboardPage() {
         </Button>
       </div>
 
+      {/* League Selector */}
+      {userLeagues.length > 0 && (
+        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Making Picks For:
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Select which league you're making picks for
+              </p>
+            </div>
+            <div className="min-w-64">
+              <select
+                value={currentLeague?.id || ''}
+                onChange={(e) => {
+                  const league = userLeagues.find(l => l.id === e.target.value);
+                  setCurrentLeague(league);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="">Select a league...</option>
+                {userLeagues.map((league) => (
+                  <option key={league.id} value={league.id}>
+                    {league.name} ({league.settings?.maxMembers || 'Unlimited'} members)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {currentLeague && (
+            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="flex items-center space-x-4">
+                <div>
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    {currentLeague.name}
+                  </p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    {currentLeague.description || 'No description'}
+                  </p>
+                </div>
+                <div className="ml-auto">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
+                    {currentLeague.memberCount || 0} members
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* No Leagues Warning */}
+      {userLeagues.length === 0 && !leagueStats.loading && (
+        <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                No leagues joined yet
+              </h3>
+              <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
+                <p>You need to join or create a league before making picks.</p>
+              </div>
+              <div className="mt-4">
+                <div className="-mx-2 -my-1.5 flex">
+                  <Button
+                    onClick={() => router.push('/leagues')}
+                    size="sm"
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                  >
+                    Join a League
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Live Scoreboard */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Week 1 Games & Picks
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{currentLeague ? `${currentLeague.name} - ` : ''}Week 1 Games & Picks</h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Make your picks before games start
+            {currentLeague 
+              ? `Make your picks for ${currentLeague.name} before games start`
+              : 'Select a league above to make picks'
+            }
           </p>
         </div>
         <div className="p-6">
-          <LiveScoreboard enablePicks={true} onPickSubmitted={loadPickStats} />
+          {currentLeague ? (
+            <LiveScoreboard enablePicks={true} onPickSubmitted={loadPickStats} />
+          ) : (
+            <div className="text-center py-12">
+              <div className="flex flex-col items-center space-y-4">
+                <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
+                  <Target className="h-8 w-8 text-gray-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    Select a League
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">
+                    Choose which league you want to make picks for from the selector above.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

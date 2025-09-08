@@ -10,6 +10,7 @@ import { startRSSCronJobs } from './services/rss/cron';
 import adminRoutes from './routes/admin.routes';
 import { pickRoutes } from './routes/pick.routes';
 import { authRoutes } from './routes/auth.routes';
+import leagueRoutes from './routes/league.routes';
 import { errorHandler } from './utils/errors';
 
 const app = express();
@@ -49,6 +50,7 @@ app.get('/health', async (_req, res) => {
 // API routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/v1/picks', pickRoutes);
+app.use('/api/v1/leagues', leagueRoutes);
 app.use('/auth', authRoutes);
 
 // Error handling middleware
@@ -69,8 +71,8 @@ async function startServer() {
     // Test database connection
     const dbConnected = await testDatabaseConnection();
     if (!dbConnected) {
-      logger.error('Failed to connect to database');
-      process.exit(1);
+      logger.warn('Database connection failed - continuing with limited functionality');
+      // Don't exit, continue with in-memory operations
     }
 
     // Start RSS cron jobs if enabled
