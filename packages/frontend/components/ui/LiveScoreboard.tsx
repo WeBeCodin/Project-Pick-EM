@@ -37,6 +37,16 @@ interface LiveScoreboardProps {
   enablePicks?: boolean;
 
   /**
+   * League ID for league-specific picks
+   */
+  leagueId?: string;
+
+  /**
+   * User ID for pick submission
+   */
+  userId?: string;
+
+  /**
    * Callback when a pick is submitted successfully
    */
   onPickSubmitted?: () => void;
@@ -53,6 +63,8 @@ export function LiveScoreboard({
   compact = false,
   maxGames,
   enablePicks = false,
+  leagueId,
+  userId,
   onPickSubmitted
 }: LiveScoreboardProps) {
   const { games, isLoading, error, lastUpdated, isPolling, refresh } = useLiveScores({
@@ -97,8 +109,13 @@ export function LiveScoreboard({
   }, [enablePicks]);
 
   const loadUserPicks = async () => {
+    if (!leagueId || !userId) {
+      console.log('⚠️ No leagueId or userId provided, skipping pick loading');
+      return;
+    }
+
     try {
-      const response = await fetch('/api/picks');
+      const response = await fetch(`/api/picks?leagueId=${leagueId}&userId=${userId}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data && result.data.picks) {
@@ -110,6 +127,7 @@ export function LiveScoreboard({
             return acc;
           }, {});
           setUserPicks(picksMap);
+          console.log(`📦 Loaded ${result.data.picks.length} picks for league ${leagueId}`);
         }
       }
     } catch (error) {
@@ -118,6 +136,11 @@ export function LiveScoreboard({
   };
 
   const handlePickSubmit = async (gameId: string, selectedTeam: 'home' | 'away', confidence: number) => {
+    if (!leagueId || !userId) {
+      console.error('❌ Cannot submit pick: leagueId or userId missing');
+      return;
+    }
+
     try {
       const response = await fetch('/api/picks', {
         method: 'POST',
@@ -127,7 +150,9 @@ export function LiveScoreboard({
         body: JSON.stringify({
           gameId,
           selectedTeam,
-          confidence
+          confidence,
+          leagueId,
+          userId
         })
       });
 
@@ -137,6 +162,8 @@ export function LiveScoreboard({
           ...prev,
           [gameId]: { selectedTeam, confidence }
         }));
+        
+        console.log(`✅ Pick submitted for league ${leagueId}: ${selectedTeam} (confidence: ${confidence})`);
         
         // Call the callback to update parent component
         onPickSubmitted?.();

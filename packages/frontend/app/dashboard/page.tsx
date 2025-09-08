@@ -32,15 +32,31 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadPickStats();
       loadLeagueStats();
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (isAuthenticated && currentLeague) {
+      loadPickStats();
+    }
+  }, [isAuthenticated, currentLeague]);
+
   const loadPickStats = async () => {
     try {
-      // Load user picks
-      const picksResponse = await fetch('/api/picks');
+      // Only load picks if a league is selected
+      if (!currentLeague) {
+        setPickStats({
+          totalPicks: 0,
+          totalGames: 0,
+          weekRecord: '0-0',
+          winRate: 0
+        });
+        return;
+      }
+
+      // Load user picks for the selected league
+      const picksResponse = await fetch(`/api/picks?leagueId=${currentLeague.id}&userId=${user?.id || 'anonymous'}`);
       const picksData = await picksResponse.json();
       
       // Load current week games to get total count
@@ -291,7 +307,12 @@ export default function DashboardPage() {
         </div>
         <div className="p-6">
           {currentLeague ? (
-            <LiveScoreboard enablePicks={true} onPickSubmitted={loadPickStats} />
+            <LiveScoreboard 
+              enablePicks={true} 
+              onPickSubmitted={loadPickStats}
+              leagueId={currentLeague.id}
+              userId={user?.id || 'anonymous'}
+            />
           ) : (
             <div className="text-center py-12">
               <div className="flex flex-col items-center space-y-4">

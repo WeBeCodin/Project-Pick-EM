@@ -8,9 +8,10 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId') || 'demo-user';
+    const leagueId = searchParams.get('leagueId');
     const weekId = searchParams.get('weekId') || undefined;
 
-    console.log('📖 Loading picks for user:', userId);
+    console.log('📖 Loading picks for user:', userId, 'league:', leagueId);
 
     // Load from database on first request if picks array is empty
     if (picks.length === 0) {
@@ -28,7 +29,8 @@ export async function GET(request: NextRequest) {
             selectedTeam: pick.isHomeTeamPick ? 'home' : 'away',
             selectedTeamId: pick.selectedTeamId,
             confidence: pick.confidence || 1,
-            weekId: pick.weekId
+            weekId: pick.weekId,
+            leagueId: pick.leagueId || 'global' // Default to 'global' for legacy picks
           }));
           console.log(`📦 Loaded ${picks.length} picks from database`);
         }
@@ -37,12 +39,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filter picks for the requested user
-    const userPicks = picks.filter(pick => pick.userId === userId);
+    // Filter picks for the requested user and league
+    let userPicks = picks.filter(pick => pick.userId === userId);
+    
+    if (leagueId) {
+      userPicks = userPicks.filter(pick => pick.leagueId === leagueId);
+      console.log(`🎯 Filtered to ${userPicks.length} picks for league ${leagueId}`);
+    }
 
     return NextResponse.json({
       success: true,
-      data: userPicks,
+      data: { picks: userPicks },
       message: `Found ${userPicks.length} picks`,
     });
 
@@ -58,7 +65,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId = 'demo-user', gameId, selectedTeam, selectedTeamId, confidence } = body;
+    const { userId = 'demo-user', gameId, selectedTeam, selectedTeamId, confidence, leagueId } = body;
 
     if (!gameId) {
       return NextResponse.json({
@@ -67,11 +74,18 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log('💾 Creating/updating pick:', { userId, gameId, selectedTeam, selectedTeamId, confidence });
+    if (!leagueId) {
+      return NextResponse.json({
+        success: false,
+        error: 'League ID is required for picks',
+      }, { status: 400 });
+    }
 
-    // Create or update pick in memory
+    console.log('💾 Creating/updating pick:', { userId, gameId, selectedTeam, selectedTeamId, confidence, leagueId });
+
+    // Create or update pick in memory (league-specific)
     const existingPickIndex = picks.findIndex(pick => 
-      pick.userId === userId && pick.gameId === gameId
+      pick.userId === userId && pick.gameId === gameId && pick.leagueId === leagueId
     );
 
     const pickData = {
@@ -81,14 +95,17 @@ export async function POST(request: NextRequest) {
       selectedTeam,
       selectedTeamId,
       confidence: confidence || 1,
+      leagueId,
       weekId: 'week-1', // Default week
       updatedAt: new Date().toISOString()
     };
 
     if (existingPickIndex >= 0) {
       picks[existingPickIndex] = { ...picks[existingPickIndex], ...pickData };
+      console.log('✅ Updated existing pick for league:', leagueId);
     } else {
       picks.push(pickData);
+      console.log('✅ Created new pick for league:', leagueId);
     }
 
     // Try to save to database for persistence (don't fail if it doesn't work)
