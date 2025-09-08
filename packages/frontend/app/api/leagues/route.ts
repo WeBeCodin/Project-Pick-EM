@@ -34,12 +34,16 @@ export async function GET(request: NextRequest) {
     if (action === 'my-leagues') {
       const userLeagues = inMemoryLeagues.filter(league => 
         league.creator === userId || 
-        league.members.some((member: any) => member.username === userId)
+        league.members.some((member: any) => 
+          member.username === userId || member.userId === userId
+        )
       );
+      
+      console.log('🔍 Found', userLeagues.length, 'leagues for user:', userId);
       
       return NextResponse.json({
         success: true,
-        data: userLeagues,
+        data: { leagues: userLeagues },
       });
     }
 
@@ -47,13 +51,15 @@ export async function GET(request: NextRequest) {
       const publicLeagues = inMemoryLeagues.filter(league => 
         !league.isPrivate && 
         league.creator !== userId &&
-        !league.members.some((member: any) => member.username === userId) &&
+        !league.members.some((member: any) => 
+          member.username === userId || member.userId === userId
+        ) &&
         league.members.length < league.maxMembers
       );
       
       return NextResponse.json({
         success: true,
-        data: publicLeagues,
+        data: { leagues: publicLeagues },
       });
     }
 
@@ -121,9 +127,11 @@ export async function POST(request: NextRequest) {
       id: `league_${leagueIdCounter++}`,
       name,
       description,
-      creator: ownerData.username || 'demo-user',
+      creator: ownerData.userId || ownerData.username || 'demo-user',
+      creatorUsername: ownerData.username || 'demo-user',
       members: [
         {
+          userId: ownerData.userId || ownerData.username || 'demo-user',
           username: ownerData.username || 'demo-user',
           joinedAt: new Date().toISOString(),
           role: 'creator'
