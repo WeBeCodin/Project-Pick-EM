@@ -16,6 +16,7 @@ import {
   Check
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { fetchUserLeagues, getEffectiveUserId } from '@/lib/user-utils';
 
 interface League {
   id: string;
@@ -75,8 +76,7 @@ interface League {
       setError(null);
 
       if (activeTab === 'my-leagues') {
-        const response = await fetch(`/api/leagues?action=my-leagues&userId=${user?.id || 'anonymous'}`);
-        const data = await response.json();
+        const data = await fetchUserLeagues(user, 'my-leagues');
         
         if (data.success) {
           setMyLeagues(data.data.leagues || []);
@@ -84,7 +84,8 @@ interface League {
           setError(data.error);
         }
       } else if (activeTab === 'public') {
-        const response = await fetch(`/api/leagues?action=public&userId=${user?.id || 'anonymous'}`);
+        const userId = getEffectiveUserId(user);
+        const response = await fetch(`/api/leagues?action=public&userId=${userId}`);
         const data = await response.json();
         
         if (data.success) {
@@ -122,7 +123,7 @@ interface League {
             scoringSystem: createForm.scoringSystem,
           },
           ownerData: {
-            userId: user?.id || 'anonymous',
+            userId: getEffectiveUserId(user),
             username: user?.username || 'Unknown User',
           },
         }),
@@ -144,8 +145,7 @@ interface League {
         setActiveTab('my-leagues');
         
         // Force reload my leagues regardless of current tab state
-        const myLeaguesResponse = await fetch(`/api/leagues?action=my-leagues&userId=${user?.id || 'anonymous'}`);
-        const myLeaguesData = await myLeaguesResponse.json();
+        const myLeaguesData = await fetchUserLeagues(user, 'my-leagues');
         
         if (myLeaguesData.success) {
           setMyLeagues(myLeaguesData.data.leagues || []);
@@ -179,7 +179,7 @@ interface League {
           leagueId,
           action: 'join',
           userData: {
-            userId: user?.id || 'anonymous',
+            userId: getEffectiveUserId(user),
             username: user?.username || 'Unknown User',
           },
         }),
@@ -192,8 +192,7 @@ interface League {
         setActiveTab('my-leagues');
         
         // Force reload my leagues regardless of current tab state  
-        const myLeaguesResponse = await fetch(`/api/leagues?action=my-leagues&userId=${user?.id || 'anonymous'}`);
-        const myLeaguesData = await myLeaguesResponse.json();
+        const myLeaguesData = await fetchUserLeagues(user, 'my-leagues');
         
         if (myLeaguesData.success) {
           setMyLeagues(myLeaguesData.data.leagues || []);
@@ -322,7 +321,7 @@ interface League {
                   <LeagueCard
                     key={league.id}
                     league={league}
-                    isOwner={league.ownerId === (user?.id || 'anonymous')}
+                    isOwner={(league as any).creator === getEffectiveUserId(user) || league.ownerId === getEffectiveUserId(user)}
                     onCopyCode={copyInviteCode}
                     onCopyLink={copyInviteLink}
                     copiedCode={copiedCode}
@@ -366,7 +365,10 @@ interface League {
             ) : publicLeagues.length > 0 ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {publicLeagues.map((league) => {
-                  const isAlreadyMember = league.members?.some(member => member.userId === (user?.id || 'anonymous'));
+                  const isAlreadyMember = league.members?.some(member => 
+                    member.userId === getEffectiveUserId(user) || 
+                    member.username === getEffectiveUserId(user)
+                  );
                   return (
                     <LeagueCard
                       key={league.id}

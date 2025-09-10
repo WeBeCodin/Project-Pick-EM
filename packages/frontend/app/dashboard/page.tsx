@@ -6,6 +6,7 @@ import { Trophy, Users, TrendingUp, Target } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import LiveScoreboard from '@/components/ui/LiveScoreboard';
+import { fetchUserLeagues } from '@/lib/user-utils';
 
 export default function DashboardPage() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -88,9 +89,8 @@ export default function DashboardPage() {
 
     const loadLeagueStats = async () => {
     try {
-      // Load user leagues
-      const response = await fetch(`/api/leagues?action=my-leagues&userId=${user?.id || 'demo-user'}`);
-      const data = await response.json();
+      // Load user leagues using the utility function
+      const data = await fetchUserLeagues(user, 'my-leagues');
       
       if (data.success && data.data) {
         const leagues = data.data.leagues || [];
