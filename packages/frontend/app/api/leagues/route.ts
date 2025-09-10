@@ -26,8 +26,28 @@ let leagueIdCounter = 2;
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId') || 'demo-user';
+    let userId = searchParams.get('userId');
     const action = searchParams.get('action');
+
+    // If no userId provided, try to find any user that has leagues
+    if (!userId || userId === 'demo-user') {
+      // Check if demo-user has leagues, if not, find the first user with leagues
+      const demoUserLeagues = inMemoryLeagues.filter(league => 
+        league.creator === 'demo-user' || 
+        league.members.some((member: any) => 
+          member.username === 'demo-user' || member.userId === 'demo-user'
+        )
+      );
+      
+      if (demoUserLeagues.length === 0 && inMemoryLeagues.length > 0) {
+        // Find the first user who has leagues
+        const firstLeague = inMemoryLeagues[0];
+        userId = firstLeague.creator || firstLeague.members[0]?.userId || firstLeague.members[0]?.username || 'demo-user';
+        console.log('🔄 No demo-user leagues found, using first available user:', userId);
+      } else {
+        userId = 'demo-user';
+      }
+    }
 
     console.log('📖 Loading leagues, action:', action, 'userId:', userId);
 
