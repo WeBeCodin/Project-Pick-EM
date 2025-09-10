@@ -622,14 +622,14 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, onView, c
               <span className="text-sm text-gray-600 dark:text-gray-400 min-w-fit">Invite Link:</span>
               <button
                 onClick={() => onCopyLink?.(league.id)}
-                className="flex-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm text-left hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="flex-1 min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm text-left hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors overflow-hidden"
                 title="Copy invite link"
               >
-                <span className="text-blue-600 dark:text-blue-400 truncate block">
+                <span className="text-blue-600 dark:text-blue-400 truncate block w-full">
                   {typeof window !== 'undefined' ? `${window.location.origin}/leagues/join/${league.id}` : `/leagues/join/${league.id}`}
                 </span>
               </button>
-              <div className="p-1">
+              <div className="p-1 flex-shrink-0">
                 {copiedLink === league.id ? (
                   <Check className="h-4 w-4 text-green-500" />
                 ) : (
