@@ -27,7 +27,7 @@ interface League {
   isPrivate: boolean;
   maxMembers?: number;
   allowLateJoin: boolean;
-  scoringSystem: 'STANDARD' | 'CONFIDENCE' | 'SPREAD';
+  scoringSystem: 'STANDARD' | 'CONFIDENCE';
   members: Array<{
     userId: string;
     username: string;
@@ -469,9 +469,8 @@ interface League {
                         onChange={(e) => setCreateForm({ ...createForm, scoringSystem: e.target.value as any })}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                       >
-                        <option value="CONFIDENCE">Confidence Points</option>
                         <option value="STANDARD">Standard (1 point per win)</option>
-                        <option value="SPREAD">Against the Spread</option>
+                        <option value="CONFIDENCE">Confidence Points</option>
                       </select>
                     </div>
                   </div>
@@ -534,8 +533,7 @@ function LeagueCard({ league, isOwner, onCopyCode, onCopyLink, onJoin, onView, c
     switch (system) {
       case 'CONFIDENCE': return 'Confidence Points';
       case 'STANDARD': return 'Standard';
-      case 'SPREAD': return 'Against Spread';
-      default: return system;
+      default: return system || 'Standard';
     }
   };
 

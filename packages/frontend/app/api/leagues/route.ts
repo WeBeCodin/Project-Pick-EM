@@ -10,6 +10,7 @@ let inMemoryLeagues: any[] = [
     creator: 'demo-user',
     members: [
       {
+        userId: 'demo-user',
         username: 'demo-user',
         joinedAt: new Date().toISOString(),
         role: 'creator'
@@ -17,7 +18,8 @@ let inMemoryLeagues: any[] = [
     ],
     maxMembers: 20,
     isPrivate: false,
-    scoringType: 'Standard',
+    scoringType: 'STANDARD',
+    scoringSystem: 'STANDARD',
     createdAt: new Date().toISOString()
   }
 ];
@@ -159,7 +161,8 @@ export async function POST(request: NextRequest) {
       ],
       maxMembers: settings?.maxMembers || 20,
       isPrivate: settings?.isPrivate || false,
-      scoringType: settings?.scoringSystem || 'Standard',
+      scoringType: settings?.scoringSystem || 'STANDARD',
+      scoringSystem: settings?.scoringSystem || 'STANDARD', // Add both for compatibility
       createdAt: new Date().toISOString()
     };
 
@@ -186,7 +189,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { leagueId, action, userId } = body;
+    const { leagueId, action, userData } = body;
 
     if (action === 'join') {
       const league = inMemoryLeagues.find(l => l.id === leagueId);
@@ -197,8 +200,11 @@ export async function PUT(request: NextRequest) {
         }, { status: 404 });
       }
 
+      const userId = userData?.userId || userData?.username || 'anonymous';
+      const username = userData?.username || userId;
+
       const isAlreadyMember = league.members.some((member: any) => 
-        member.username === userId
+        member.username === username || member.userId === userId
       );
 
       if (isAlreadyMember) {
@@ -209,7 +215,8 @@ export async function PUT(request: NextRequest) {
       }
 
       league.members.push({
-        username: userId,
+        userId: userId,
+        username: username,
         joinedAt: new Date().toISOString(),
         role: 'member'
       });
