@@ -89,7 +89,7 @@ export default function DashboardPage() {
     const loadLeagueStats = async () => {
     try {
       // Load user leagues
-      const response = await fetch('/api/leagues?action=my-leagues');
+      const response = await fetch(`/api/leagues?action=my-leagues&userId=${user?.id || 'demo-user'}`);
       const data = await response.json();
       
       if (data.success && data.data) {
