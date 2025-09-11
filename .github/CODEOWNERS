@@ -1,0 +1,6 @@
+# Database changes need review
+/packages/backend/prisma/ @WeBeCodin
+/packages/backend/src/services/league/ @WeBeCodin
+
+# Critical auth paths
+/packages/backend/src/services/auth/ @WeBeCodin

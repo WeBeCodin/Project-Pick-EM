@@ -1,0 +1,11 @@
+workspace:
+  context:
+    - packages/backend/prisma/schema.prisma
+    - packages/backend/src/services/league/
+    - packages/frontend/app/(dashboard)/leagues/
+    - packages/frontend/app/api/leagues/route.ts
+  validations:
+    - name: League Membership Consistency
+      test: "User remains in league after logout/login"
+    - name: Member Count Accuracy
+      test: "League shows correct member count"

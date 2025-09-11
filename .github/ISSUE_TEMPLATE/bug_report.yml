@@ -1,0 +1,28 @@
+name: Bug Report
+description: File a bug report
+labels: ["bug", "triage"]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - League Management
+        - User Authentication
+        - Pick System
+        - Database/Prisma
+        - Frontend UI
+    validations:
+      required: true
+  - type: textarea
+    id: repro-steps
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the issue
+      value: |
+        1. Create a league
+        2. Sign out
+        3. Sign back in
+        4. Check league membership
+    validations:
+      required: true

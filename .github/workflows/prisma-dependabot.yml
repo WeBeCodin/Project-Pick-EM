@@ -1,0 +1,34 @@
+name: Prisma Update Validation
+
+on:
+  pull_request:
+    paths:
+      - 'packages/backend/package*.json'
+      - 'packages/backend/prisma/**'
+
+jobs:
+  validate-schema:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: npm ci
+      - name: Generate diff script
+        run: |
+          npx prisma migrate diff \
+            --from-schema-datasource prisma/schema.prisma \
+            --to-schema-datamodel prisma/schema.prisma \
+            --script > migration.sql
+          echo "Generated migration diff:" && head -n 200 migration.sql || true
+      - name: Check for destructive changes
+        run: |
+          if grep -E "\\bDROP\\b|\\bDELETE\\b" migration.sql; then 
+            echo "::error::Potentially destructive migration detected"; 
+            exit 1; 
+          fi

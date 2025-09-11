@@ -1,0 +1,9 @@
+queue_rules:
+  - name: default
+    conditions:
+      - check-success=build
+      - check-success=Prisma Validation
+      - check-success=E2E Tests
+      - check-success=CodeQL
+    merge_method: squash
+    update_method: rebase

@@ -2,5 +2,12 @@
   "buildCommand": "cd packages/frontend && npm run build",
   "outputDirectory": "packages/frontend/.next",
   "framework": "nextjs",
-  "installCommand": "npm install --prefix packages/frontend"
+  "installCommand": "npm install --prefix packages/frontend",
+  "github": {
+    "enabled": true,
+    "autoAlias": true,
+    "silent": false,
+    "autoJobCancelation": true
+  },
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet ."
 }
