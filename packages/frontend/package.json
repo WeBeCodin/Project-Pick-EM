@@ -8,6 +8,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "npm run type-check",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "type-check": "tsc --noEmit",

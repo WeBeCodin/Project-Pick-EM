@@ -1,9 +1,16 @@
 queue_rules:
   - name: default
     conditions:
+      # All status checks must pass
       - check-success=build
-      - check-success=Prisma Validation
-      - check-success=E2E Tests
-      - check-success=CodeQL
+      - check-success=validate-schema (Prisma Schema Validation)
+      - check-success=test (E2E Tests)
+      - check-success=analyze (CodeQL Security Analysis)
+      # At least one approval required
+      - "#approved-reviews-by>=1"
+      # No pending changes requested
+      - "#changes-requested-reviews-by=0"
+      # Branch must be up to date
+      - base=main
     merge_method: squash
     update_method: rebase

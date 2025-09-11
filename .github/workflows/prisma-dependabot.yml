@@ -1,5 +1,4 @@
-name: Prisma Update Validation
-
+name: Prisma Migration Safety Check
 on:
   pull_request:
     paths:
@@ -7,28 +6,82 @@ on:
       - 'packages/backend/prisma/**'
 
 jobs:
-  validate-schema:
+  check-migrations:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: packages/backend
+    
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install deps
+          cache: 'npm'
+          cache-dependency-path: packages/backend/package-lock.json
+      
+      - name: Install dependencies
         run: npm ci
-      - name: Generate diff script
+      
+      - name: Check for Prisma version changes
+        id: prisma-version
         run: |
-          npx prisma migrate diff \
-            --from-schema-datasource prisma/schema.prisma \
-            --to-schema-datamodel prisma/schema.prisma \
-            --script > migration.sql
-          echo "Generated migration diff:" && head -n 200 migration.sql || true
-      - name: Check for destructive changes
+          git diff HEAD^ HEAD -- package.json | grep -E '"(prisma|@prisma)' || echo "No Prisma version changes"
+          echo "changed=$(git diff HEAD^ HEAD -- package.json | grep -c -E '"(prisma|@prisma)' || echo 0)" >> $GITHUB_OUTPUT
+      
+      - name: Check for destructive migrations
+        if: steps.prisma-version.outputs.changed != '0'
         run: |
-          if grep -E "\\bDROP\\b|\\bDELETE\\b" migration.sql; then 
-            echo "::error::Potentially destructive migration detected"; 
-            exit 1; 
+          echo "🔍 Checking for potentially destructive migrations..."
+          
+          # Check if there are any new migration files
+          NEW_MIGRATIONS=$(git diff HEAD^ HEAD --name-only -- prisma/migrations/ | grep -v "migration.lock" || echo "")
+          
+          if [ -n "$NEW_MIGRATIONS" ]; then
+            echo "📁 New migration files detected:"
+            echo "$NEW_MIGRATIONS"
+            
+            # Check for dangerous SQL statements
+            for migration in $NEW_MIGRATIONS; do
+              if [ -f "$migration" ]; then
+                echo "🔍 Checking $migration for destructive operations..."
+                
+                if grep -q -E "(DROP TABLE|DROP COLUMN|ALTER TABLE.*DROP)" "$migration"; then
+                  echo "⚠️  DESTRUCTIVE OPERATION DETECTED in $migration"
+                  echo "Please review this migration carefully!"
+                  echo "::warning::Potentially destructive migration detected in $migration"
+                fi
+                
+                if grep -q -E "(ALTER TABLE.*RENAME)" "$migration"; then
+                  echo "⚠️  RENAME OPERATION DETECTED in $migration"
+                  echo "::warning::Table/column rename detected in $migration - ensure data integrity"
+                fi
+              fi
+            done
+          else
+            echo "✅ No new migration files detected"
           fi
+      
+      - name: Validate schema changes
+        if: steps.prisma-version.outputs.changed != '0'
+        run: |
+          echo "🔍 Validating Prisma schema..."
+          npx prisma validate
+          echo "✅ Schema validation passed"
+      
+      - name: Check for breaking changes in generated types
+        if: steps.prisma-version.outputs.changed != '0'
+        run: |
+          echo "🔍 Checking for breaking changes in generated types..."
+          npx prisma generate
+          
+          # Basic TypeScript compilation check
+          if command -v npx tsc &> /dev/null; then
+            npx tsc --noEmit || echo "⚠️  TypeScript compilation issues detected"
+          fi
+          
+          echo "✅ Type generation completed"

@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "buildCommand": "cd packages/frontend && npm run build",
   "outputDirectory": "packages/frontend/.next",
   "framework": "nextjs",
@@ -9,5 +10,28 @@
     "silent": false,
     "autoJobCancelation": true
   },
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet ."
+  "functions": {
+    "packages/frontend/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet . || (git diff HEAD^ HEAD --name-only | grep -E '^(packages/frontend|docs)/' > /dev/null)",
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/dashboard",
+      "permanent": false
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ]
 }

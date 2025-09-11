@@ -1,24 +1,71 @@
 version: 2
 updates:
+  # Backend dependencies
   - package-ecosystem: "npm"
     directory: "/packages/backend"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 10
+      time: "04:00"
     commit-message:
-      prefix: "backend"
+      prefix: "backend(deps)"
+    labels:
+      - "dependencies"
+      - "backend"
+    open-pull-requests-limit: 10
     groups:
       prisma:
         patterns:
           - "@prisma/*"
           - "prisma"
         update-types:
-          - "minor"
+          - "minor" 
           - "patch"
+      auth:
+        patterns:
+          - "jsonwebtoken"
+          - "bcrypt*"
+          - "passport*"
+        update-types:
+          - "patch"
+
+  # Frontend dependencies  
   - package-ecosystem: "npm"
     directory: "/packages/frontend"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 10
+      time: "04:00"
     commit-message:
-      prefix: "frontend"
+      prefix: "frontend(deps)"
+    labels:
+      - "dependencies"
+      - "frontend"
+    open-pull-requests-limit: 10
+    groups:
+      next:
+        patterns:
+          - "next"
+          - "@next/*"
+          - "react"
+          - "react-dom"
+        update-types:
+          - "minor"
+          - "patch"
+      ui:
+        patterns:
+          - "@radix-ui/*"
+          - "lucide-react"
+          - "tailwindcss"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Root dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "root(deps)"
+    labels:
+      - "dependencies"
+      - "monorepo"

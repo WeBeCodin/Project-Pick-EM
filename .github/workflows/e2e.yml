@@ -1,5 +1,4 @@
 name: E2E Tests
-
 on:
   push:
     branches: [ main ]
@@ -8,26 +7,62 @@ on:
 
 jobs:
   test:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nfl_pickem_e2e
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install root deps
+          cache: 'npm'
+      
+      - name: Install root dependencies
         run: npm ci
-      - name: Install Playwright
+      
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+      
+      - name: Setup Backend Database
+        working-directory: packages/backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nfl_pickem_e2e
         run: |
-          npm i -D @playwright/test
-          npx playwright install --with-deps
-      - name: Build frontend
-        run: npm run build
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nfl_pickem_e2e" > .env.test
+          npm ci
+          npx prisma migrate deploy
+          npx prisma db seed
+      
+      - name: Build Frontend
+        working-directory: packages/frontend
+        run: |
+          npm ci
+          npm run build
+      
       - name: Run Playwright tests
         env:
-          BASE_URL: http://localhost:3000
-        run: npx playwright test || echo "No tests yet"
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nfl_pickem_e2e
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+        run: npx playwright test
+      
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
           path: playwright-report/
+          retention-days: 30

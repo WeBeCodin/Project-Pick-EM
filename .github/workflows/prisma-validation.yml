@@ -1,43 +1,83 @@
-name: Prisma Validation
-
-on:
+name: Prisma Schema Validation
+on: 
   push:
-    paths:
-      - 'packages/backend/prisma/**'
-      - 'packages/backend/package*.json'
-      - '.github/workflows/prisma-validation.yml'
+    branches: [ main, api-fixes-* ]
   pull_request:
-    paths:
-      - 'packages/backend/prisma/**'
-      - 'packages/backend/package*.json'
+    branches: [ main ]
 
 jobs:
-  validate:
+  validate-schema:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: packages/backend
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nfl_pickem_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
+          cache: 'npm'
+          cache-dependency-path: packages/backend/package-lock.json
+      
       - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup test database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nfl_pickem_test
         run: |
-          npm ci
-
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nfl_pickem_test" > .env.test
+          npx prisma migrate deploy
+      
       - name: Validate Prisma Schema
         run: |
           npx prisma validate
-          npx prisma generate
-
+          npx prisma format --check
+          echo "✅ Prisma schema is valid"
+      
       - name: Check Migration Status
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nfl_pickem_test
         run: |
           npx prisma migrate status
-
-      - name: Typecheck backend
-        run: npx tsc -p tsconfig.json --noEmit
+          echo "✅ Migrations are up to date"
+      
+      - name: Generate Prisma Client
+        run: |
+          npx prisma generate
+          echo "✅ Prisma client generated successfully"
+      
+      - name: TypeScript Type Check
+        run: |
+          npx tsc --noEmit
+          echo "✅ TypeScript types are valid"
+      
+      - name: Test Database Connection
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nfl_pickem_test
+        run: |
+          node -e "
+            const { PrismaClient } = require('@prisma/client');
+            const prisma = new PrismaClient();
+            prisma.\$connect()
+              .then(() => console.log('✅ Database connection successful'))
+              .catch(e => { console.error('❌ Database connection failed:', e); process.exit(1); })
+              .finally(() => prisma.\$disconnect());
+          "

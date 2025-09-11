@@ -1,11 +1,54 @@
 workspace:
+  name: "Project Pick-EM Development"
+  description: "AI-assisted development workspace for NFL Pick 'Em application"
+  
   context:
+    # Core database schema
     - packages/backend/prisma/schema.prisma
+    - packages/backend/src/database/
+    
+    # Critical services
     - packages/backend/src/services/league/
+    - packages/backend/src/services/auth/
+    
+    # Frontend league management
     - packages/frontend/app/(dashboard)/leagues/
-    - packages/frontend/app/api/leagues/route.ts
+    - packages/frontend/contexts/auth-context.tsx
+    - packages/frontend/lib/user-utils.ts
+    
+    # API routes
+    - packages/frontend/app/api/leagues/
+    - packages/frontend/app/api/auth/
+    
+    # Configuration
+    - vercel.json
+    - docker-compose*.yml
+  
   validations:
-    - name: League Membership Consistency
-      test: "User remains in league after logout/login"
-    - name: Member Count Accuracy
-      test: "League shows correct member count"
+    - name: "League Membership Persistence"
+      description: "User remains in league after logout/login cycle"
+      test: "User creates league, logs out, logs back in, still shows as league member"
+      
+    - name: "Member Count Accuracy"
+      description: "League displays correct member count across all views"
+      test: "League member count consistent between dashboard, league list, and league detail"
+      
+    - name: "Scoring System Integrity"
+      description: "Scoring system properly saved and displayed (STANDARD/CONFIDENCE only)"
+      test: "No 'spread' or undefined scoring types appear in UI"
+      
+    - name: "Session Data Continuity"
+      description: "User session persists league associations across browser sessions"
+      test: "Refresh page, close/reopen browser - user still associated with correct leagues"
+      
+    - name: "Database Schema Consistency"
+      description: "Prisma schema matches actual database structure"
+      test: "npx prisma migrate status shows no pending migrations"
+
+  guidelines:
+    - "Always validate Prisma schema changes with `npx prisma validate`"
+    - "Test league membership persistence after any auth/league changes"
+    - "Ensure member counts are accurate in all UI components"
+    - "Use TypeScript types from Prisma client for consistency"
+    - "Check for SQL injection vulnerabilities in custom queries"
+    - "Verify user session data persists across logout/login cycles"

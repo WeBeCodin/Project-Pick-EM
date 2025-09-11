@@ -1,6 +1,29 @@
-# Database changes need review
-/packages/backend/prisma/ @WeBeCodin
-/packages/backend/src/services/league/ @WeBeCodin
+# Code Owners for Project Pick-EM
+# These users will be automatically requested for review when PRs modify certain files
 
-# Critical auth paths
+# Database schema and migrations require careful review
+/packages/backend/prisma/ @WeBeCodin
+/packages/backend/src/database/ @WeBeCodin
+
+# Critical authentication and league services
 /packages/backend/src/services/auth/ @WeBeCodin
+/packages/backend/src/services/league/ @WeBeCodin
+/packages/backend/src/middleware/auth* @WeBeCodin
+
+# API route definitions
+/packages/backend/src/routes/ @WeBeCodin
+/packages/frontend/app/api/ @WeBeCodin
+
+# Critical frontend components
+/packages/frontend/contexts/auth-context.tsx @WeBeCodin
+/packages/frontend/app/(dashboard)/leagues/ @WeBeCodin
+/packages/frontend/lib/user-utils.ts @WeBeCodin
+
+# Deployment and infrastructure
+/vercel.json @WeBeCodin
+/docker-compose*.yml @WeBeCodin
+/.github/workflows/ @WeBeCodin
+
+# Root configuration
+/package.json @WeBeCodin
+/tsconfig*.json @WeBeCodin

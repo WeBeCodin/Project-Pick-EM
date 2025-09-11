@@ -23,7 +23,7 @@ async function backendRequest(endpoint: string, options: RequestInit = {}) {
   } catch (error) {
     console.error('Backend request failed:', error);
     // Fallback to mock data for now
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
