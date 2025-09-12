@@ -1,6 +1,8 @@
 import { UnauthorizedError, ConflictError } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import { prisma } from '../../database';
+import { passwordService } from './password.service';
+import { tokenService } from './token.service';
 
 // Simplified interfaces for MVP
 export interface RegisterData {
@@ -23,7 +25,8 @@ export interface AuthResult {
     displayName: string | null;
     emailVerified: boolean;
   };
-  token: string; // Single token for now
+  accessToken: string;
+  refreshToken: string;
 }
 
 export class AuthService {
@@ -53,12 +56,14 @@ export class AuthService {
         }
       }
 
-      // For now, using a simple password (in production, would hash)
+  // Hash password before saving
+  const hashedPassword = await passwordService.hash(data.password);
+
       const user = await prisma.user.create({
         data: {
           email: data.email,
           username: data.username,
-          password: data.password, // TODO: Hash password
+          password: hashedPassword,
           displayName: data.displayName || null
         },
         select: {
@@ -72,9 +77,14 @@ export class AuthService {
 
       logger.info('User registered successfully', { userId: user.id, email: user.email });
 
+  // Issue JWT tokens
+  const accessToken = tokenService.signAccessToken({ userId: user.id });
+  const refreshToken = tokenService.signRefreshToken({ userId: user.id });
+
       return {
         user,
-        token: `mock-token-${user.id}` // Mock token for now
+        accessToken,
+        refreshToken
       };
     } catch (error) {
       logger.error('Registration failed:', error);
@@ -116,12 +126,17 @@ export class AuthService {
         throw new UnauthorizedError('Account has been deactivated');
       }
 
-      // Simple password check (in production, would compare hashed)
-      if (user.password !== data.password) {
+      // Compare password using bcrypt
+      const valid = await passwordService.compare(data.password, user.password);
+      if (!valid) {
         throw new UnauthorizedError('Invalid credentials');
       }
 
       logger.info('User login successful', { userId: user.id });
+
+  // Issue JWT tokens
+  const accessToken = tokenService.signAccessToken({ userId: user.id });
+  const refreshToken = tokenService.signRefreshToken({ userId: user.id });
 
       return {
         user: {
@@ -131,7 +146,8 @@ export class AuthService {
           displayName: user.displayName,
           emailVerified: user.emailVerified
         },
-        token: `mock-token-${user.id}` // Mock token for now
+        accessToken,
+        refreshToken
       };
     } catch (error) {
       logger.error('Login failed:', error);
