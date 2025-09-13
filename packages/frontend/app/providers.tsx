@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AuthProvider } from '@/contexts/auth-context';
+import { ClerkAuthProvider } from '@/contexts/clerk-auth-context';
 import { useState } from 'react';
 import { Toaster } from 'react-hot-toast';
 
@@ -25,7 +25,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <ClerkAuthProvider>
         {children}
         <Toaster
           position="top-right"
@@ -47,7 +47,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             },
           }}
         />
-      </AuthProvider>
+      </ClerkAuthProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
