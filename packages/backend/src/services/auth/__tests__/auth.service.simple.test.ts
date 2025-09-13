@@ -52,9 +52,10 @@ describe('AuthService Simple', () => {
       const result = await authService.register(validRegistrationData);
 
       expect(result).toHaveProperty('user');
-      expect(result).toHaveProperty('token');
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
       expect(result.user.email).toBe('test@example.com');
-      expect(result.token).toContain('mock-token-');
+      expect(result.accessToken).toContain('mock-token-');
     });
 
     it('should throw ConflictError for existing email', async () => {
@@ -81,7 +82,8 @@ describe('AuthService Simple', () => {
       const result = await authService.login(validLoginData);
 
       expect(result).toHaveProperty('user');
-      expect(result).toHaveProperty('token');
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
       expect(result.user.email).toBe('test@example.com');
     });
 

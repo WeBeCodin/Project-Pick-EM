@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/contexts/clerk-auth-context';
 import { Button } from '@/components/ui/button';
 import { Trophy, Users, TrendingUp, Target } from 'lucide-react';
 import { useEffect, useState } from 'react';

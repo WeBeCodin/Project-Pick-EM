@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/contexts/clerk-auth-context';
 import { Trophy, Medal, TrendingUp, Users } from 'lucide-react';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
