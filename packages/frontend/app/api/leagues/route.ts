@@ -62,9 +62,9 @@ const userSessions: Record<string, { leagues: string[], lastActive: string }> = 
   'demo-persistent-user': { leagues: ['league_1'], lastActive: new Date().toISOString() }
 };
 
-// Helper to get user from request with persistent ID
-async function getUserFromRequest(request: NextRequest) {
-  // Try session first
+// Helper to get user from request with Clerk and session support
+async function getUserFromRequest(request: NextRequest, bodyData?: any) {
+  // Try session first (legacy support)
   const session = await getSession();
   if (session) {
     return {
@@ -74,10 +74,28 @@ async function getUserFromRequest(request: NextRequest) {
     };
   }
   
-  // Fallback to query params with persistent ID generation
+  // Handle user data from body (for POST/PUT requests)
+  if (bodyData?.ownerData) {
+    return {
+      userId: bodyData.ownerData.userId,
+      username: bodyData.ownerData.username,
+      email: bodyData.ownerData.email || ''
+    };
+  }
+  
+  // Fallback to query params
   const url = new URL(request.url);
+  const userId = url.searchParams.get('userId');
   const email = url.searchParams.get('email');
-  const username = url.searchParams.get('username') || url.searchParams.get('userId') || 'anonymous';
+  const username = url.searchParams.get('username') || 'User';
+  
+  if (userId) {
+    return {
+      userId,
+      username,
+      email: email || ''
+    };
+  }
   
   if (email) {
     return {
@@ -87,11 +105,10 @@ async function getUserFromRequest(request: NextRequest) {
     };
   }
   
-  // Last resort - try to use existing userId but make it persistent-like
-  const userId = url.searchParams.get('userId') || 'anonymous';
+  // Default fallback
   return {
-    userId,
-    username: username,
+    userId: 'demo-user',
+    username: 'Demo User',
     email: ''
   };
 }
@@ -201,8 +218,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request);
     const body = await request.json();
+    const user = await getUserFromRequest(request, body);
     const { name, description, settings } = body;
 
     if (!name || !description) {
@@ -267,8 +284,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request);
     const body = await request.json();
+    const user = await getUserFromRequest(request, body);
     const { leagueId, action } = body;
 
     if (action === 'join') {

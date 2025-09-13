@@ -16,7 +16,7 @@ import {
   Check
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { fetchUserLeagues, getEffectiveUserId } from '@/lib/user-utils';
+import { fetchUserLeagues, getEffectiveUserId, getEffectiveUsername, getEffectiveEmail } from '@/lib/user-utils';
 
 interface League {
   id: string;
@@ -124,7 +124,8 @@ interface League {
           },
           ownerData: {
             userId: getEffectiveUserId(user),
-            username: user?.username || 'Unknown User',
+            username: getEffectiveUsername(user),
+            email: getEffectiveEmail(user),
           },
         }),
       });
