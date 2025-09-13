@@ -10,11 +10,6 @@
     "silent": false,
     "autoJobCancelation": true
   },
-  "functions": {
-    "packages/frontend/app/api/**/route.ts": {
-      "maxDuration": 30
-    }
-  },
   "ignoreCommand": "git diff HEAD^ HEAD --quiet . || (git diff HEAD^ HEAD --name-only | grep -E '^(packages/frontend|docs)/' > /dev/null)",
   "redirects": [
     {
