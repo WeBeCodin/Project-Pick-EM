@@ -3,7 +3,7 @@
   "buildCommand": "cd packages/frontend && npm run build",
   "outputDirectory": "packages/frontend/.next",
   "framework": "nextjs",
-  "installCommand": "npm install --prefix packages/frontend",
+  "installCommand": "npm install --prefix packages/frontend --legacy-peer-deps",
   "github": {
     "enabled": true,
     "autoAlias": true,
