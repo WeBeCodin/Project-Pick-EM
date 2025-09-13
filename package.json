@@ -5,7 +5,18 @@
   "description": "Community NFL Pick 'Em Challenge - Free-to-play web application with Node.js backend, Next.js frontend, and shared types",
   "author": "WeBeCodin",
   "license": "MIT",
-  "keywords": ["nfl", "pickem", "sports", "challenge", "monorepo", "typescript", "nextjs", "express", "postgresql", "redis"],
+  "keywords": [
+    "nfl",
+    "pickem",
+    "sports",
+    "challenge",
+    "monorepo",
+    "typescript",
+    "nextjs",
+    "express",
+    "postgresql",
+    "redis"
+  ],
   "workspaces": [
     "packages/*"
   ],
@@ -42,6 +53,7 @@
   "devDependencies": {
     "@commitlint/cli": "^18.4.3",
     "@commitlint/config-conventional": "^18.4.3",
+    "@playwright/test": "^1.55.0",
     "@types/node": "^20.10.5",
     "autoprefixer": "^10.4.21",
     "concurrently": "^8.2.2",

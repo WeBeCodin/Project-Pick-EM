@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSession } from '@/lib/session-store';
 
 interface MockUser {
   id: string;
@@ -10,12 +11,30 @@ interface MockUser {
   role: string;
 }
 
-// This route provides user authentication data, primarily for development/testing
+// This route provides user authentication data using persistent sessions
 export async function GET(request: NextRequest) {
   try {
-    // In a real implementation, this would verify JWT tokens and return user data
-    // For now, we'll simulate user authentication based on headers or query params
+    // First try to get from session
+    const session = await getSession();
     
+    if (session) {
+      // Return user data from session
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: session.persistentId,
+          username: session.username,
+          email: session.email,
+          displayName: session.username,
+          emailVerified: false,
+          isActive: true,
+          role: 'user'
+        },
+        authenticated: true
+      });
+    }
+    
+    // Fallback for backwards compatibility
     const authHeader = request.headers.get('authorization');
     const userIdHeader = request.headers.get('x-user-id');
     const { searchParams } = new URL(request.url);
@@ -52,7 +71,7 @@ export async function GET(request: NextRequest) {
       }
     };
 
-    // Determine which user to return
+    // Determine which user to return (fallback logic)
     let userId = 'demo-user'; // default
     
     if (queryUserId && mockUsers[queryUserId]) {
@@ -73,9 +92,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // If no session and no valid fallback auth, return unauthorized
+    if (!authHeader && !userIdHeader && !queryUserId) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 });
+    }
+
     const user = mockUsers[userId] || mockUsers['demo-user'];
 
-    console.log('🔐 Auth/me returning user:', userId, user.displayName);
+    console.log('🔐 Auth/me returning fallback user:', userId, user.displayName);
 
     return NextResponse.json({
       success: true,

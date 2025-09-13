@@ -34,7 +34,6 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: packages/backend/package-lock.json
       
       - name: Install dependencies
         run: npm ci
@@ -47,6 +46,8 @@ jobs:
           npx prisma migrate deploy
       
       - name: Validate Prisma Schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nfl_pickem_test
         run: |
           npx prisma validate
           npx prisma format --check
@@ -60,11 +61,15 @@ jobs:
           echo "✅ Migrations are up to date"
       
       - name: Generate Prisma Client
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nfl_pickem_test
         run: |
           npx prisma generate
           echo "✅ Prisma client generated successfully"
       
       - name: TypeScript Type Check
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nfl_pickem_test
         run: |
           npx tsc --noEmit
           echo "✅ TypeScript types are valid"

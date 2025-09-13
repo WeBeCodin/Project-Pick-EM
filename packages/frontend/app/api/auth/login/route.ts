@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createSession, getPersistentUserId } from '@/lib/session-store';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,25 +14,37 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Mock login success
+    // Determine if it's an email or username
+    const isEmail = emailOrUsername.includes('@');
+    const email = isEmail ? emailOrUsername : `${emailOrUsername}@demo.com`;
+    const username = isEmail ? emailOrUsername.split('@')[0] : emailOrUsername;
+
+    // Generate persistent ID from email
+    const persistentId = getPersistentUserId(email);
+
+    // Create session with persistent ID
+    const sessionData = {
+      userId: `session_${Date.now()}`, // Temporary session ID
+      persistentId, // Permanent ID that survives logout/login
+      username,
+      email
+    };
+
+    await createSession(sessionData);
+
+    // Return user data with persistent ID
     const mockUser = {
-      id: `user_${Date.now()}`,
-      username: emailOrUsername,
-      email: emailOrUsername.includes('@') ? emailOrUsername : `${emailOrUsername}@demo.com`,
-      displayName: emailOrUsername,
+      id: persistentId, // Use persistent ID as the main ID
+      username,
+      email,
+      displayName: username,
       createdAt: new Date().toISOString()
     };
 
-    const mockToken = `mock_token_${Date.now()}`;
-
     return NextResponse.json({
       success: true,
-      data: {
-        user: mockUser,
-        token: mockToken,
-        refreshToken: `refresh_${mockToken}`
-      },
-      message: 'Login successful (Demo Mode)'
+      user: mockUser, // Simplified response format
+      message: 'Login successful with persistent session'
     }, { status: 200 });
 
   } catch (error) {

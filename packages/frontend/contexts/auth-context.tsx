@@ -66,14 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       });
 
-      const { user: userData, token } = response.data.data;
+      // Updated to handle new response format with persistent sessions
+      const userData = response.data.user; // Direct user object, not nested in data
       
       setUser(userData);
-      localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(userData));
-      
-      // Set token in axios defaults
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // Note: No token needed with cookie-based sessions
       
       toast.success(`Welcome back, ${userData.displayName || userData.username}!`);
       router.push('/dashboard');
@@ -111,10 +109,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [router]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      // Call logout endpoint to clear server session
+      await api.post('/api/auth/logout');
+    } catch (error) {
+      console.error('Logout API error:', error);
+    }
+    
+    // Clear client state
     setUser(null);
-    localStorage.removeItem('authToken');
     localStorage.removeItem('user');
+    localStorage.removeItem('authToken'); // Clean up legacy token if exists
     delete api.defaults.headers.common['Authorization'];
     toast.success('Logged out successfully');
     router.push('/login');

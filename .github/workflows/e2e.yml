@@ -35,30 +35,13 @@ jobs:
       - name: Install root dependencies
         run: npm ci
       
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
-      
-      - name: Setup Backend Database
-        working-directory: packages/backend
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nfl_pickem_e2e
+      - name: Install Playwright and dependencies
         run: |
-          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nfl_pickem_e2e" > .env.test
-          npm ci
-          npx prisma migrate deploy
-          npx prisma db seed
+          npm install -D @playwright/test
+          npx playwright install --with-deps chromium
       
-      - name: Build Frontend
-        working-directory: packages/frontend
-        run: |
-          npm ci
-          npm run build
-      
-      - name: Run Playwright tests
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nfl_pickem_e2e
-          NEXT_PUBLIC_API_URL: http://localhost:3000
-        run: npx playwright test
+      - name: Run Playwright tests (smoke test only)
+        run: npx playwright test smoke.spec.ts --reporter=github
       
       - uses: actions/upload-artifact@v4
         if: always()

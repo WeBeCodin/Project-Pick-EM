@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSession, getPersistentUserId } from '@/lib/session-store';
 
 // Enhanced in-memory storage with proper user session tracking
 interface LeagueMember {
@@ -33,10 +34,10 @@ let persistentLeagues: League[] = [
     name: 'Demo League',
     description: 'A sample league for testing user persistence',
     code: 'DEMO2024',
-    creator: 'demo-user',
+    creator: 'demo-persistent-user',
     members: [
       {
-        userId: 'demo-user',
+        userId: 'demo-persistent-user',
         username: 'demo-user',
         joinedAt: new Date().toISOString(),
         role: 'owner',
@@ -56,11 +57,44 @@ let persistentLeagues: League[] = [
 
 let leagueIdCounter = 2;
 
-// User session tracking for persistence across logout/login
+// User session tracking for persistence across logout/login - now uses persistent IDs
 const userSessions: Record<string, { leagues: string[], lastActive: string }> = {
-  'demo-user': { leagues: ['league_1'], lastActive: new Date().toISOString() },
-  'user_tfcdesigns': { leagues: [], lastActive: new Date().toISOString() }
+  'demo-persistent-user': { leagues: ['league_1'], lastActive: new Date().toISOString() }
 };
+
+// Helper to get user from request with persistent ID
+async function getUserFromRequest(request: NextRequest) {
+  // Try session first
+  const session = await getSession();
+  if (session) {
+    return {
+      userId: session.persistentId,
+      username: session.username,
+      email: session.email
+    };
+  }
+  
+  // Fallback to query params with persistent ID generation
+  const url = new URL(request.url);
+  const email = url.searchParams.get('email');
+  const username = url.searchParams.get('username') || url.searchParams.get('userId') || 'anonymous';
+  
+  if (email) {
+    return {
+      userId: getPersistentUserId(email),
+      username: username,
+      email
+    };
+  }
+  
+  // Last resort - try to use existing userId but make it persistent-like
+  const userId = url.searchParams.get('userId') || 'anonymous';
+  return {
+    userId,
+    username: username,
+    email: ''
+  };
+}
 
 // Generate unique league code
 function generateLeagueCode(): string {
@@ -88,36 +122,36 @@ function updateLeagueMetadata(league: League) {
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getUserFromRequest(request);
     const { searchParams } = new URL(request.url);
-    let userId = searchParams.get('userId') || 'demo-user';
     const action = searchParams.get('action');
 
-    console.log('📖 Enhanced leagues API - Loading leagues, action:', action, 'userId:', userId);
+    console.log('📖 Enhanced leagues API - Loading leagues, action:', action, 'persistent userId:', user.userId);
     console.log('📊 Current persistent leagues count:', persistentLeagues.length);
     console.log('👥 User sessions tracked:', Object.keys(userSessions).length);
 
-    // Update user session activity for continuity
-    if (!userSessions[userId]) {
-      userSessions[userId] = { leagues: [], lastActive: new Date().toISOString() };
+    // Update user session activity for continuity with persistent ID
+    if (!userSessions[user.userId]) {
+      userSessions[user.userId] = { leagues: [], lastActive: new Date().toISOString() };
     }
-    userSessions[userId].lastActive = new Date().toISOString();
+    userSessions[user.userId].lastActive = new Date().toISOString();
 
     if (action === 'my-leagues') {
-      // Get leagues where user is ACTIVE member or creator
+      // Get leagues where user is ACTIVE member or creator using persistent ID
       const userLeagues = persistentLeagues.filter(league => {
         const isMember = league.members.some(member => 
-          (member.username === userId || member.userId === userId) && 
+          member.userId === user.userId && 
           member.isActive && 
           member.status === 'ACTIVE'
         );
-        const isCreator = league.creator === userId;
+        const isCreator = league.creator === user.userId;
         return isMember || isCreator;
       });
       
       // Ensure member counts are accurate
       userLeagues.forEach(updateLeagueMetadata);
       
-      console.log('🔍 Found', userLeagues.length, 'active leagues for user:', userId);
+      console.log('🔍 Found', userLeagues.length, 'active leagues for persistent user:', user.userId);
       userLeagues.forEach(league => {
         console.log(`   - ${league.name}: ${league.memberCount} members, Status: ACTIVE`);
       });
@@ -132,7 +166,7 @@ export async function GET(request: NextRequest) {
       // Get public leagues excluding those where user is already a member
       const publicLeagues = persistentLeagues.filter(league => {
         const isUserMember = league.members.some(member => 
-          (member.username === userId || member.userId === userId) && 
+          member.userId === user.userId && 
           member.isActive
         );
         return !league.isPrivate && !isUserMember && league.memberCount < league.maxMembers;
@@ -140,7 +174,7 @@ export async function GET(request: NextRequest) {
       
       publicLeagues.forEach(updateLeagueMetadata);
       
-      console.log('🌐 Found', publicLeagues.length, 'public leagues available to user:', userId);
+      console.log('🌐 Found', publicLeagues.length, 'public leagues available to persistent user:', user.userId);
       
       return NextResponse.json({
         success: true,
@@ -167,30 +201,28 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getUserFromRequest(request);
     const body = await request.json();
-    const { name, description, settings, ownerData } = body;
+    const { name, description, settings } = body;
 
-    if (!name || !description || !ownerData) {
+    if (!name || !description) {
       return NextResponse.json({
         success: false,
-        error: 'Name, description, and user data are required',
+        error: 'Name and description are required',
       }, { status: 400 });
     }
 
-    const userId = ownerData.userId || ownerData.username;
-    const username = ownerData.username || userId;
-
-    // Create new league with proper session tracking
+    // Create new league with persistent user ID
     const newLeague: League = {
       id: `league_${leagueIdCounter++}`,
       name,
       description,
       code: generateLeagueCode(),
-      creator: userId,
+      creator: user.userId,
       members: [
         {
-          userId: userId,
-          username: username,
+          userId: user.userId,
+          username: user.username,
           joinedAt: new Date().toISOString(),
           role: 'owner',
           status: 'ACTIVE',
@@ -212,9 +244,9 @@ export async function POST(request: NextRequest) {
     // Update user session tracking for continuity
     updateLeagueMetadata(newLeague);
 
-    console.log('✅ League created successfully:', newLeague.name, 'by', username);
+    console.log('✅ League created successfully:', newLeague.name, 'by persistent user:', user.username);
     console.log('📊 Updated league count:', persistentLeagues.length);
-    console.log('👥 Creator session updated:', userSessions[userId]);
+    console.log('👥 Creator session updated:', userSessions[user.userId]);
 
     return NextResponse.json({
       success: true,
@@ -235,8 +267,9 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const user = await getUserFromRequest(request);
     const body = await request.json();
-    const { leagueId, action, userData } = body;
+    const { leagueId, action } = body;
 
     if (action === 'join') {
       const league = persistentLeagues.find(l => l.id === leagueId);
@@ -247,12 +280,9 @@ export async function PUT(request: NextRequest) {
         }, { status: 404 });
       }
 
-      const userId = userData?.userId || userData?.username || 'anonymous';
-      const username = userData?.username || userId;
-
-      // Check if already a member
+      // Check if already a member using persistent ID
       const existingMember = league.members.find(member => 
-        member.username === username || member.userId === userId
+        member.userId === user.userId
       );
 
       if (existingMember) {
@@ -266,19 +296,19 @@ export async function PUT(request: NextRequest) {
           existingMember.isActive = true;
           existingMember.status = 'ACTIVE';
           existingMember.joinedAt = new Date().toISOString();
-          console.log('🔄 Reactivated member:', username, 'in league:', league.name);
+          console.log('🔄 Reactivated member:', user.username, 'in league:', league.name);
         }
       } else {
         // Add new member
         league.members.push({
-          userId: userId,
-          username: username,
+          userId: user.userId,
+          username: user.username,
           joinedAt: new Date().toISOString(),
           role: 'member',
           status: 'ACTIVE',
           isActive: true
         });
-        console.log('➕ Added new member:', username, 'to league:', league.name);
+        console.log('➕ Added new member:', user.username, 'to league:', league.name);
       }
 
       // Update league metadata and user session for persistence
@@ -286,7 +316,7 @@ export async function PUT(request: NextRequest) {
 
       console.log('✅ League join successful');
       console.log('👥 Updated member count:', league.memberCount);
-      console.log('📊 User session updated:', userSessions[userId]);
+      console.log('📊 User session updated:', userSessions[user.userId]);
 
       return NextResponse.json({
         success: true,
@@ -304,9 +334,8 @@ export async function PUT(request: NextRequest) {
         }, { status: 404 });
       }
 
-      const userId = userData?.userId || userData?.username || 'anonymous';
       const member = league.members.find(m => 
-        (m.username === userId || m.userId === userId) && m.isActive
+        m.userId === user.userId && m.isActive
       );
 
       if (!member) {
@@ -328,13 +357,13 @@ export async function PUT(request: NextRequest) {
       member.status = 'INACTIVE';
       
       // Remove from user session
-      if (userSessions[userId]) {
-        userSessions[userId].leagues = userSessions[userId].leagues.filter(id => id !== leagueId);
+      if (userSessions[user.userId]) {
+        userSessions[user.userId].leagues = userSessions[user.userId].leagues.filter(id => id !== leagueId);
       }
 
       updateLeagueMetadata(league);
 
-      console.log('👋 Member left league:', userId, 'from', league.name);
+      console.log('👋 Member left league:', user.userId, 'from', league.name);
 
       return NextResponse.json({
         success: true,
