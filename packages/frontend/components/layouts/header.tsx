@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/contexts/clerk-auth-context';
+import { SignInButton, SignOutButton, UserButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { User, Trophy, Calendar, LogOut, Menu, Users } from 'lucide-react';
 import { useState } from 'react';
 
 export function Header() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -56,18 +57,10 @@ export function Header() {
                   <div className="flex items-center space-x-2">
                     <User className="h-4 w-4 text-gray-500" />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {user?.displayName || user?.username}
+                      {user?.firstName || user?.username || 'User'}
                     </span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={logout}
-                    className="text-gray-700 dark:text-gray-300 hover:text-red-600"
-                  >
-                    <LogOut className="h-4 w-4 mr-1" />
-                    Logout
-                  </Button>
+                  <UserButton afterSignOutUrl="/" />
                 </div>
 
                 {/* Mobile menu button */}
@@ -82,14 +75,14 @@ export function Header() {
               </>
             ) : (
               <div className="flex items-center space-x-3">
-                <Link href="/login">
+                <SignInButton mode="modal">
                   <Button variant="ghost" size="sm">
                     Login
                   </Button>
-                </Link>
-                <Link href="/register">
+                </SignInButton>
+                <SignInButton mode="modal">
                   <Button size="sm">Sign Up</Button>
-                </Link>
+                </SignInButton>
               </div>
             )}
           </div>
@@ -127,21 +120,10 @@ export function Header() {
                 <div className="flex items-center space-x-2">
                   <User className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {user?.displayName || user?.username}
+                    {user?.firstName || user?.username || 'User'}
                   </span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    logout();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="text-red-600"
-                >
-                  <LogOut className="h-4 w-4 mr-1" />
-                  Logout
-                </Button>
+                <UserButton afterSignOutUrl="/" />
               </div>
             </div>
           </div>

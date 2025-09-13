@@ -15,6 +15,7 @@
     "postinstall": "prisma generate || true"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.32.0",
     "@hookform/resolvers": "^3.3.2",
     "@prisma/client": "^5.22.0",
     "@radix-ui/react-alert-dialog": "^1.0.5",
