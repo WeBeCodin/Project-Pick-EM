@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, getPersistentUserId } from '@/lib/session-store';
-import { StorageAdapter } from '@/lib/storage-adapter';
-import { sanitizeForLogging } from '@/lib/log-utils';
 
-// Database-first approach with file storage fallback for reliability
+// Enhanced in-memory storage with proper user session tracking
 interface LeagueMember {
   userId: string;
   username: string;
@@ -29,18 +27,43 @@ interface League {
   memberCount: number;
 }
 
+// Enhanced persistent storage with user session tracking
+let persistentLeagues: League[] = [
+  {
+    id: 'league_1',
+    name: 'Demo League',
+    description: 'A sample league for testing user persistence',
+    code: 'DEMO2024',
+    creator: 'demo-persistent-user',
+    members: [
+      {
+        userId: 'demo-persistent-user',
+        username: 'demo-user',
+        joinedAt: new Date().toISOString(),
+        role: 'owner',
+        status: 'ACTIVE',
+        isActive: true
+      }
+    ],
+    maxMembers: 20,
+    isPrivate: false,
+    scoringType: 'STANDARD',
+    scoringSystem: 'STANDARD',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    memberCount: 1
+  }
+];
+
+let leagueIdCounter = 2;
+
+// User session tracking for persistence across logout/login - now uses persistent IDs
+const userSessions: Record<string, { leagues: string[], lastActive: string }> = {
+  'demo-persistent-user': { leagues: ['league_1'], lastActive: new Date().toISOString() }
+};
+
 // Helper to get user from request with Clerk and session support
 async function getUserFromRequest(request: NextRequest, bodyData?: any) {
-  // Prioritize x-user-id header for test scripts and consistent auth
-  const headerUserId = request.headers.get('x-user-id');
-  if (headerUserId) {
-    return {
-      userId: headerUserId,
-      username: `User-${headerUserId.substring(0, 8)}`,
-      email: `${headerUserId}@test.com`,
-    };
-  }
-
   // Try session first (legacy support)
   const session = await getSession();
   if (session) {
@@ -57,15 +80,6 @@ async function getUserFromRequest(request: NextRequest, bodyData?: any) {
       userId: bodyData.ownerData.userId,
       username: bodyData.ownerData.username,
       email: bodyData.ownerData.email || ''
-    };
-  }
-  
-  // Handle user data for join/leave operations
-  if (bodyData?.userData) {
-    return {
-      userId: bodyData.userData.userId,
-      username: bodyData.userData.username,
-      email: bodyData.userData.email || ''
     };
   }
   
@@ -99,6 +113,29 @@ async function getUserFromRequest(request: NextRequest, bodyData?: any) {
   };
 }
 
+// Generate unique league code
+function generateLeagueCode(): string {
+  return Math.random().toString(36).substr(2, 6).toUpperCase();
+}
+
+// Update member counts and user sessions for persistence
+function updateLeagueMetadata(league: League) {
+  league.memberCount = league.members.filter(m => m.isActive).length;
+  league.updatedAt = new Date().toISOString();
+  
+  // Update user sessions for continuity
+  league.members.forEach(member => {
+    if (member.isActive) {
+      if (!userSessions[member.userId]) {
+        userSessions[member.userId] = { leagues: [], lastActive: new Date().toISOString() };
+      }
+      if (!userSessions[member.userId].leagues.includes(league.id)) {
+        userSessions[member.userId].leagues.push(league.id);
+      }
+      userSessions[member.userId].lastActive = new Date().toISOString();
+    }
+  });
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -106,57 +143,108 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
 
-    console.log('📖 Persistent storage leagues API - Loading leagues, action:', sanitizeForLogging(action), 'user:', sanitizeForLogging(user.userId));
+    console.log('📖 Enhanced leagues API - Loading leagues, action:', action, 'persistent userId:', user.userId);
+    console.log('📊 Current persistent leagues count:', persistentLeagues.length);
+    console.log('👥 User sessions tracked:', Object.keys(userSessions).length);
+
+    // Update user session activity for continuity with persistent ID
+    if (!userSessions[user.userId]) {
+      userSessions[user.userId] = { leagues: [], lastActive: new Date().toISOString() };
+    }
+    userSessions[user.userId].lastActive = new Date().toISOString();
 
     if (action === 'my-leagues') {
-      console.log('🔍 Loading user leagues from persistent storage for:', user.userId);
-      
-      const allLeagues = await StorageAdapter.getLeagues();
-      const userLeagues = allLeagues.filter((league: League) => {
-        const isMember = league.members.some((member: LeagueMember) => 
-          member.userId === user.userId && member.isActive
+      // Get leagues where user is ACTIVE member or creator using persistent ID
+      const userLeagues = persistentLeagues.filter(league => {
+        const isMember = league.members.some(member => 
+          member.userId === user.userId && 
+          member.isActive && 
+          member.status === 'ACTIVE'
         );
         const isCreator = league.creator === user.userId;
         return isMember || isCreator;
       });
-
-      console.log('✅ Found', userLeagues.length, 'leagues for user from persistent storage');
-      userLeagues.forEach((league: League) => {
-        console.log(`   - ${league.name}: ${league.memberCount} members, ID: ${league.id}`);
+      
+      // Ensure member counts are accurate
+      userLeagues.forEach(updateLeagueMetadata);
+      
+      console.log('🔍 Found', userLeagues.length, 'active leagues for persistent user:', user.userId);
+      userLeagues.forEach(league => {
+        console.log(`   - ${league.name}: ${league.memberCount} members, Status: ACTIVE`);
       });
-
+      
       return NextResponse.json({
         success: true,
-        data: userLeagues,
+        data: { leagues: userLeagues },
       });
     }
 
     if (action === 'public') {
-      console.log('🌐 Loading public leagues from persistent storage');
-      
-      const allLeagues = await StorageAdapter.getLeagues();
-      const publicLeagues = allLeagues.filter((league: League) => {
-        const isUserMember = league.members.some((member: LeagueMember) => 
-          member.userId === user.userId && member.isActive
+      // Get public leagues excluding those where user is already a member
+      const publicLeagues = persistentLeagues.filter(league => {
+        const isUserMember = league.members.some(member => 
+          member.userId === user.userId && 
+          member.isActive
         );
         return !league.isPrivate && !isUserMember && league.memberCount < league.maxMembers;
       });
-
-      console.log('✅ Found', publicLeagues.length, 'public leagues from persistent storage');
-
+      
+      publicLeagues.forEach(updateLeagueMetadata);
+      
+      console.log('🌐 Found', publicLeagues.length, 'public leagues available to persistent user:', user.userId);
+      
       return NextResponse.json({
         success: true,
         data: { leagues: publicLeagues },
       });
     }
 
-    // Return all leagues
-    const allLeagues = await StorageAdapter.getLeagues();
-    console.log('📊 Retrieved', allLeagues.length, 'leagues from persistent storage');
+    // Get specific league by ID (supports both 'id' param and 'action=single&leagueId' format)
+    const leagueId = searchParams.get('id') || searchParams.get('leagueId');
+    
+    console.log('📋 League API Debug:', {
+      searchParams: Object.fromEntries(searchParams.entries()),
+      leagueId,
+      action,
+      allLeagues: persistentLeagues.map(l => ({ id: l.id, name: l.name }))
+    });
+    
+    if (leagueId || action === 'single') {
+      const targetLeagueId = leagueId || searchParams.get('leagueId');
+      if (!targetLeagueId) {
+        console.error('❌ No league ID provided');
+        return NextResponse.json({
+          success: false,
+          error: 'League ID is required',
+        }, { status: 400 });
+      }
+      
+      console.log('🔍 Looking for league:', targetLeagueId);
+      const league = persistentLeagues.find(l => l.id === targetLeagueId);
+      
+      if (!league) {
+        console.error('❌ League not found:', targetLeagueId, 'Available:', persistentLeagues.map(l => l.id));
+        return NextResponse.json({
+          success: false,
+          error: 'League not found',
+        }, { status: 404 });
+      }
+      
+      console.log('✅ Found league:', league.id, league.name);
+      updateLeagueMetadata(league);
+      
+      return NextResponse.json({
+        success: true,
+        data: league,
+      });
+    }
+
+    // Return all leagues with updated metadata
+    persistentLeagues.forEach(updateLeagueMetadata);
     
     return NextResponse.json({
       success: true,
-      data: allLeagues,
+      data: persistentLeagues,
     });
 
   } catch (error) {
@@ -174,43 +262,56 @@ export async function POST(request: NextRequest) {
     const user = await getUserFromRequest(request, body);
     const { name, description, settings } = body;
 
-    if (!name || !description || !settings) {
+    if (!name || !description) {
       return NextResponse.json({
         success: false,
-        error: 'Name, description, and settings object are required',
+        error: 'Name and description are required',
       }, { status: 400 });
     }
 
-    console.log('✨ Creating league in persistent storage:', sanitizeForLogging(name), 'for user:', sanitizeForLogging(user.username));
+    // Create new league with persistent user ID
+    const newLeague: League = {
+      id: `league_${leagueIdCounter++}`,
+      name,
+      description,
+      code: generateLeagueCode(),
+      creator: user.userId,
+      members: [
+        {
+          userId: user.userId,
+          username: user.username,
+          joinedAt: new Date().toISOString(),
+          role: 'owner',
+          status: 'ACTIVE',
+          isActive: true
+        }
+      ],
+      maxMembers: settings?.maxMembers || 10,
+      isPrivate: settings?.isPrivate || false,
+      scoringType: (settings?.scoringType || settings?.scoringSystem || 'STANDARD') as 'STANDARD' | 'CONFIDENCE',
+      scoringSystem: (settings?.scoringType || settings?.scoringSystem || 'STANDARD') as 'STANDARD' | 'CONFIDENCE',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      memberCount: 1
+    };
 
-    try {
-      const newLeague = await StorageAdapter.createLeague({
-        name,
-        description,
-        isPrivate: settings.isPrivate ?? false,
-        maxMembers: settings.maxMembers ?? 20,
-        scoringSystem: (settings.scoringSystem || 'STANDARD').toUpperCase(),
-        createdById: user.userId,
-        username: user.username
-      });
+    // Add to persistent storage
+    persistentLeagues.push(newLeague);
+    
+    // Update user session tracking for continuity
+    updateLeagueMetadata(newLeague);
 
-      console.log('✅ League created in persistent storage successfully:', sanitizeForLogging(newLeague.name));
-      console.log('📊 League ID:', sanitizeForLogging(newLeague.id));
-      console.log('👥 Initial member count:', newLeague.memberCount);
+    console.log('✅ League created successfully:', newLeague.name, 'by persistent user:', user.username);
+    console.log('📊 Updated league count:', persistentLeagues.length);
+    console.log('👥 Creator session updated:', userSessions[user.userId]);
 
-      return NextResponse.json({
-        success: true,
-        data: newLeague,
-      });
-
-    } catch (storageError: any) {
-      console.error('❌ Storage error creating league:', storageError);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to create league',
-        details: storageError?.message || 'Unknown storage error'
-      }, { status: 500 });
-    }
+    return NextResponse.json({
+      success: true,
+      data: {
+        league: newLeague,
+        message: 'League created successfully with persistent session tracking'
+      },
+    });
 
   } catch (error) {
     console.error('Error creating league:', error);
@@ -228,65 +329,104 @@ export async function PUT(request: NextRequest) {
     const { leagueId, action } = body;
 
     if (action === 'join') {
-      console.log('🤝 User joining league via persistent storage:', sanitizeForLogging(user.username), 'to league:', sanitizeForLogging(leagueId));
-      
-      try {
-        const updatedLeague = await StorageAdapter.joinLeague(leagueId, user.userId, user.username);
-        
-        if (!updatedLeague) {
-          return NextResponse.json({
-            success: false,
-            error: 'League not found',
-          }, { status: 404 });
-        }
-
-        console.log('✅ Successfully joined league via persistent storage');
-        console.log('👥 Updated member count:', updatedLeague.memberCount);
-
-        return NextResponse.json({
-          success: true,
-          data: updatedLeague,
-          message: 'Successfully joined league with persistent storage',
-        });
-
-      } catch (storageError: any) {
-        console.error('❌ Storage error joining league:', storageError);
+      const league = persistentLeagues.find(l => l.id === leagueId);
+      if (!league) {
         return NextResponse.json({
           success: false,
-          error: storageError?.message || 'Failed to join league',
-          details: storageError?.message || 'Unknown storage error'
-        }, { status: 500 });
+          error: 'League not found',
+        }, { status: 404 });
       }
+
+      // Check if already a member using persistent ID
+      const existingMember = league.members.find(member => 
+        member.userId === user.userId
+      );
+
+      if (existingMember) {
+        if (existingMember.isActive) {
+          return NextResponse.json({
+            success: false,
+            error: 'Already an active member of this league',
+          }, { status: 400 });
+        } else {
+          // Reactivate inactive member (handles rejoin capability)
+          existingMember.isActive = true;
+          existingMember.status = 'ACTIVE';
+          existingMember.joinedAt = new Date().toISOString();
+          console.log('🔄 Reactivated member:', user.username, 'in league:', league.name);
+        }
+      } else {
+        // Add new member
+        league.members.push({
+          userId: user.userId,
+          username: user.username,
+          joinedAt: new Date().toISOString(),
+          role: 'member',
+          status: 'ACTIVE',
+          isActive: true
+        });
+        console.log('➕ Added new member:', user.username, 'to league:', league.name);
+      }
+
+      // Update league metadata and user session for persistence
+      updateLeagueMetadata(league);
+
+      console.log('✅ League join successful');
+      console.log('👥 Updated member count:', league.memberCount);
+      console.log('📊 User session updated:', userSessions[user.userId]);
+
+      return NextResponse.json({
+        success: true,
+        data: league,
+        message: 'Successfully joined league with session persistence',
+      });
     }
 
     if (action === 'leave') {
-      console.log('👋 User leaving league via persistent storage:', sanitizeForLogging(user.username), 'from league:', sanitizeForLogging(leagueId));
-      
-      try {
-        const success = await StorageAdapter.leaveLeague(leagueId, user.userId);
-        
-        if (!success) {
-          return NextResponse.json({
-            success: false,
-            error: 'League not found or not a member',
-          }, { status: 404 });
-        }
-
-        console.log('✅ Successfully left league via persistent storage');
-
-        return NextResponse.json({
-          success: true,
-          message: 'Successfully left league',
-        });
-
-      } catch (storageError: any) {
-        console.error('❌ Storage error leaving league:', storageError);
+      const league = persistentLeagues.find(l => l.id === leagueId);
+      if (!league) {
         return NextResponse.json({
           success: false,
-          error: 'Failed to leave league',
-          details: storageError?.message || 'Unknown storage error'
-        }, { status: 500 });
+          error: 'League not found',
+        }, { status: 404 });
       }
+
+      const member = league.members.find(m => 
+        m.userId === user.userId && m.isActive
+      );
+
+      if (!member) {
+        return NextResponse.json({
+          success: false,
+          error: 'Not a member of this league',
+        }, { status: 400 });
+      }
+
+      if (member.role === 'owner') {
+        return NextResponse.json({
+          success: false,
+          error: 'League owner cannot leave. Transfer ownership or delete the league.',
+        }, { status: 400 });
+      }
+
+      // Mark member as inactive instead of removing (preserves history)
+      member.isActive = false;
+      member.status = 'INACTIVE';
+      
+      // Remove from user session
+      if (userSessions[user.userId]) {
+        userSessions[user.userId].leagues = userSessions[user.userId].leagues.filter(id => id !== leagueId);
+      }
+
+      updateLeagueMetadata(league);
+
+      console.log('👋 Member left league:', user.userId, 'from', league.name);
+
+      return NextResponse.json({
+        success: true,
+        data: league,
+        message: 'Successfully left league',
+      });
     }
 
     return NextResponse.json({

@@ -29,6 +29,12 @@ export async function GET(request: NextRequest) {
     const leagueId = searchParams.get('leagueId');
     const week = searchParams.get('week');
 
+    console.log('📊 Standings API Debug:', {
+      leagueId,
+      week,
+      requestUrl: request.url
+    });
+
     if (!leagueId) {
       return NextResponse.json({
         success: false,
@@ -37,10 +43,22 @@ export async function GET(request: NextRequest) {
     }
 
     // Get league members first
+    console.log('🔗 Fetching league data from:', `${request.nextUrl.origin}/api/leagues?id=${leagueId}`);
     const leagueResponse = await fetch(`${request.nextUrl.origin}/api/leagues?id=${leagueId}`);
     const leagueData = await leagueResponse.json();
     
+    console.log('📋 League API Response:', {
+      status: leagueResponse.status,
+      success: leagueData?.success,
+      dataType: typeof leagueData?.data,
+      isArray: Array.isArray(leagueData?.data),
+      dataPreview: leagueData?.data ? (Array.isArray(leagueData?.data) ? 
+        leagueData.data.map((l: any) => ({ id: l.id, name: l.name })) : 
+        { id: leagueData.data.id, name: leagueData.data.name }) : null
+    });
+    
     if (!leagueData.success) {
+      console.error('❌ League API failed:', leagueData.error);
       return NextResponse.json({
         success: false,
         error: 'League not found',
@@ -48,7 +66,18 @@ export async function GET(request: NextRequest) {
     }
 
     const league = leagueData.data;
-    const activeMembers = league.members.filter((member: any) => member.status === 'active');
+    
+    // Ensure we have a valid league with members array
+    if (!league || !Array.isArray(league.members)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid league data or no members found',
+      }, { status: 404 });
+    }
+
+    const activeMembers = league.members.filter((member: any) => 
+      member.status === 'ACTIVE' && member.isActive === true
+    );
 
     // Generate standings only for actual league members
     const standings = activeMembers.map((member: any, index: number): LeagueStanding => ({

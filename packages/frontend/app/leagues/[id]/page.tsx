@@ -33,7 +33,8 @@ interface League {
     username: string;
     joinedAt: string;
     role: 'owner' | 'admin' | 'member';
-    status: 'active' | 'pending' | 'removed';
+    status: 'ACTIVE' | 'INACTIVE' | 'pending' | 'removed';
+    isActive: boolean;
   }>;
   code: string;
   createdAt: string;
@@ -424,8 +425,8 @@ export default function LeagueDetailPage() {
             </div>
             <div className="p-6">
               <div className="grid gap-4">
-                {league.members
-                  .filter(member => member.status === 'active')
+                {(league.members || [])
+                  .filter(member => member.status === 'ACTIVE' && member.isActive)
                   .map((member) => (
                   <div key={member.userId} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
                     <div className="flex items-center space-x-3">
