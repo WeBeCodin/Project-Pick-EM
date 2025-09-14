@@ -68,7 +68,8 @@ function generateInviteCode(): string {
  * Supports both Clerk authentication and legacy query parameters for backward compatibility
  */
 export async function GET(request: NextRequest) {
-  console.log('📥 GET /api/leagues - Starting request');
+  console.error('🚨🚨🚨 GET /api/leagues CALLED - DEBUG VERSION 3.0 🚨🚨🚨');
+  console.log('� GET /api/leagues - Starting request');
   
   try {
     const { searchParams } = new URL(request.url);
@@ -95,8 +96,10 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ User identified:', user.userId, 'Action:', action);
 
-    // Load all leagues from persistent storage
+    // Load all leagues from storage
+    console.error('🚨🚨🚨 ABOUT TO CALL leagueStorage.loadData() 🚨🚨🚨');
     const storageData = await leagueStorage.loadData();
+    console.error('🚨🚨🚨 leagueStorage.loadData() COMPLETED 🚨🚨🚨');
     const allLeagues = storageData.leagues;
     console.log(`📊 Loaded ${allLeagues.length} total leagues from storage`);
 
@@ -198,7 +201,8 @@ export async function GET(request: NextRequest) {
  * Supports both Clerk authentication and legacy request format for backward compatibility
  */
 export async function POST(request: NextRequest) {
-  console.log('📥 POST /api/leagues - Starting request');
+  console.error('🚨🚨🚨 POST /api/leagues CALLED - DEBUG VERSION 3.0 🚨🚨🚨');
+  console.log('� POST /api/leagues - League creation request');
   
   try {
     const body = await request.json();
