@@ -67,6 +67,11 @@ class LeagueStorageManager {
    * Get the default/seed data structure
    */
   private getDefaultData(): PersistentStorage {
+    const callStack = new Error().stack;
+    const caller = callStack?.split('\n')[2]?.trim() || 'unknown';
+    console.log(`🚨 getDefaultData() called from: ${caller}`);
+    console.log('🚨 THIS IS ABOUT TO OVERWRITE USER DATA!');
+    
     return {
       leagues: [
         {
@@ -111,8 +116,13 @@ class LeagueStorageManager {
    * Load data from persistent storage with multiple fallbacks
    */
   async loadData(): Promise<PersistentStorage> {
+    const callStack = new Error().stack;
+    const caller = callStack?.split('\n')[2]?.trim() || 'unknown';
+    console.log(`🔍 loadData() called from: ${caller}`);
+    
     // Return cached data if available
     if (this.cache) {
+      console.log('📱 Using cached data (no KV call needed)');
       return this.cache;
     }
 
@@ -209,6 +219,10 @@ class LeagueStorageManager {
    * Save data to persistent storage
    */
   async saveData(data: PersistentStorage): Promise<void> {
+    const callStack = new Error().stack;
+    const caller = callStack?.split('\n')[2]?.trim() || 'unknown';
+    console.log(`💾 saveData() called from: ${caller}`);
+    
     try {
       data.lastUpdated = new Date().toISOString();
       const jsonData = JSON.stringify(data);
