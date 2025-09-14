@@ -132,8 +132,18 @@ class LeagueStorageManager {
             const result = await response.json();
             if (result.result) {
               data = JSON.parse(result.result);
-              console.log('📦 Loaded data from Vercel KV');
+              if (data) {
+                const leagueCount = data.leagues?.length || 0;
+                console.log(`📦 Loaded data from Vercel KV: ${leagueCount} leagues found`);
+                if (leagueCount > 0 && data.leagues) {
+                  console.log(`📋 Leagues loaded: ${data.leagues.map(l => `${l.name} (${l.id})`).join(', ')}`);
+                }
+              }
+            } else {
+              console.log('📦 Vercel KV returned empty result - no data found');
             }
+          } else {
+            console.warn(`⚠️  Vercel KV GET failed with status: ${response.status}`);
           }
         } catch (kvError) {
           console.warn('⚠️  Vercel KV unavailable, using fallback:', kvError);
@@ -185,11 +195,17 @@ class LeagueStorageManager {
     try {
       data.lastUpdated = new Date().toISOString();
       const jsonData = JSON.stringify(data);
+      const leagueCount = data.leagues?.length || 0;
+      console.log(`💾 Saving ${leagueCount} leagues to storage at ${data.lastUpdated}`);
+      if (leagueCount > 0) {
+        console.log(`📋 Leagues to save: ${data.leagues.map(l => `${l.name} (${l.id})`).join(', ')}`);
+      }
 
       // Save to Vercel KV first (if available)
       if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
         try {
-          const response = await fetch(`${process.env.KV_REST_API_URL}/set/${this.storageKey}`, {
+          // Use PERSIST command to ensure data never expires in Vercel KV
+          const setResponse = await fetch(`${process.env.KV_REST_API_URL}/set/${this.storageKey}`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
@@ -198,8 +214,21 @@ class LeagueStorageManager {
             body: JSON.stringify({ value: jsonData })
           });
 
-          if (response.ok) {
-            console.log('💾 Data saved to Vercel KV');
+          if (setResponse.ok) {
+            // Explicitly remove any TTL with PERSIST command
+            const persistResponse = await fetch(`${process.env.KV_REST_API_URL}/persist/${this.storageKey}`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (persistResponse.ok) {
+              console.log('💾 Data saved to Vercel KV with no expiry (persisted indefinitely)');
+            } else {
+              console.log('💾 Data saved to Vercel KV (persist command failed, may have default TTL)');
+            }
           }
         } catch (kvError) {
           console.warn('⚠️  Failed to save to Vercel KV:', kvError);
