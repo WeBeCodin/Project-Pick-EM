@@ -64,7 +64,8 @@ export default function JoinLeaguePage() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/leagues?action=single&leagueId=${leagueId}`);
+      const userId = user?.id || 'anonymous';
+      const response = await fetch(`/api/leagues?action=single&leagueId=${leagueId}&userId=${userId}`);
       const data = await response.json();
       
       if (data.success) {

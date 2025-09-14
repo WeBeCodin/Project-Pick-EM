@@ -14,7 +14,8 @@ import {
   Calendar,
   Medal,
   Target,
-  ArrowLeft
+  ArrowLeft,
+  Trash2
 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 
@@ -22,12 +23,15 @@ interface League {
   id: string;
   name: string;
   description: string;
-  ownerId: string;
-  ownerName: string;
+  creator: string;
+  code: string;
   isPrivate: boolean;
-  maxMembers?: number;
-  allowLateJoin: boolean;
-  scoringSystem: 'STANDARD' | 'CONFIDENCE' | 'SPREAD';
+  maxMembers: number;
+  scoringType: 'STANDARD' | 'CONFIDENCE';
+  scoringSystem: 'STANDARD' | 'CONFIDENCE';
+  createdAt: string;
+  updatedAt: string;
+  memberCount: number;
   members: Array<{
     userId: string;
     username: string;
@@ -36,9 +40,6 @@ interface League {
     status: 'ACTIVE' | 'INACTIVE' | 'pending' | 'removed';
     isActive: boolean;
   }>;
-  code: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 interface LeagueStanding {
@@ -75,6 +76,8 @@ export default function LeagueDetailPage() {
   const [activeTab, setActiveTab] = useState<'standings' | 'members' | 'history'>('standings');
   const [, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -94,7 +97,8 @@ export default function LeagueDetailPage() {
       setError(null);
 
       // Load league details
-      const leagueResponse = await fetch(`/api/leagues?action=single&leagueId=${leagueId}`);
+      const userId = user?.id || 'anonymous';
+      const leagueResponse = await fetch(`/api/leagues?action=single&leagueId=${leagueId}&userId=${userId}`);
       const leagueData = await leagueResponse.json();
       
       if (leagueData.success) {
@@ -119,6 +123,38 @@ export default function LeagueDetailPage() {
       console.error('Error loading league:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteLeague = async () => {
+    if (!league) return;
+    
+    try {
+      setDeleting(true);
+      const response = await fetch('/api/leagues', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          leagueId: league.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Redirect to leagues page
+        router.push('/leagues');
+      } else {
+        setError(data.error || 'Failed to delete league');
+      }
+    } catch (err) {
+      console.error('Error deleting league:', err);
+      setError('Failed to delete league');
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -193,7 +229,7 @@ export default function LeagueDetailPage() {
     );
   }
 
-  const isOwner = league.ownerId === (user?.id || 'anonymous');
+  const isOwner = league.creator === (user?.id || 'anonymous');
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -210,14 +246,25 @@ export default function LeagueDetailPage() {
               Back
             </Button>
             {isOwner && (
-              <Button
-                onClick={() => router.push(`/leagues/${leagueId}/settings` as any)}
-                variant="outline"
-                size="sm"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button>
+              <>
+                <Button
+                  onClick={() => router.push(`/leagues/${leagueId}/settings` as any)}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </Button>
+                <Button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  variant="outline"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete League
+                </Button>
+              </>
             )}
           </div>
           
@@ -233,7 +280,7 @@ export default function LeagueDetailPage() {
                 {league.description}
               </p>
               <p className="text-sm text-gray-500">
-                Created by {league.ownerName} • Invite Code: <code className="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">{league.code}</code>
+                Created by {league.creator} • Invite Code: <code className="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">{league.code}</code>
               </p>
             </div>
           </div>
@@ -480,6 +527,38 @@ export default function LeagueDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Delete League
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Are you sure you want to delete "{league?.name}"? This action cannot be undone and will remove all league data, member records, and picks.
+            </p>
+            <div className="flex space-x-4">
+              <Button
+                onClick={() => setShowDeleteConfirm(false)}
+                variant="outline"
+                className="flex-1"
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteLeague}
+                variant="destructive"
+                className="flex-1"
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete League'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
