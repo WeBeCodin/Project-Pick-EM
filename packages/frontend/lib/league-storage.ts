@@ -146,7 +146,8 @@ class LeagueStorageManager {
             console.warn(`⚠️  Vercel KV GET failed with status: ${response.status}`);
           }
         } catch (kvError) {
-          console.warn('⚠️  Vercel KV unavailable, using fallback:', kvError);
+          console.error('⚠️  Vercel KV load error:', kvError);
+          console.log('🔄 Will fall back to default data');
         }
       }
 
@@ -169,10 +170,26 @@ class LeagueStorageManager {
         }
       }
 
-      // Use default data if nothing found
+      // Only use default data if this is truly a fresh installation
+      // NEVER overwrite existing user data due to temporary issues
       if (!data) {
-        data = this.getDefaultData();
-        console.log('🆕 Using default data structure');
+        // Check if we should use default data or return empty structure
+        const isFirstRun = !process.env.KV_REST_API_URL; // Only use defaults if KV not configured
+        
+        if (isFirstRun) {
+          console.log('🆕 KV not configured - using default demo data');
+          data = this.getDefaultData();
+        } else {
+          console.log('⚠️  KV configured but data load failed - using empty structure to avoid overwriting user data');
+          data = {
+            leagues: [],
+            userSessions: {},
+            leagueIdCounter: 1,
+            lastUpdated: new Date().toISOString()
+          };
+        }
+      } else {
+        console.log('✅ Successfully loaded existing data');
       }
 
       // Validate and update data structure
@@ -204,31 +221,38 @@ class LeagueStorageManager {
       // Save to Vercel KV first (if available)
       if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
         try {
-          // Use PERSIST command to ensure data never expires in Vercel KV
+          // Set data with explicit very long TTL (1 year = 31536000 seconds)  
           const setResponse = await fetch(`${process.env.KV_REST_API_URL}/set/${this.storageKey}`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ value: jsonData })
+            body: JSON.stringify({ 
+              value: jsonData,
+              ex: 31536000 // 1 year TTL in seconds
+            })
           });
 
           if (setResponse.ok) {
-            // Explicitly remove any TTL with PERSIST command
-            const persistResponse = await fetch(`${process.env.KV_REST_API_URL}/persist/${this.storageKey}`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
-                'Content-Type': 'application/json'
+            // Check the TTL of the saved key for debugging
+            try {
+              const ttlResponse = await fetch(`${process.env.KV_REST_API_URL}/ttl/${this.storageKey}`, {
+                headers: {
+                  'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`
+                }
+              });
+              
+              if (ttlResponse.ok) {
+                const ttlResult = await ttlResponse.json();
+                console.log(`💾 Data saved to Vercel KV with 1-year TTL. Current TTL: ${ttlResult.result} seconds`);
               }
-            });
-            
-            if (persistResponse.ok) {
-              console.log('💾 Data saved to Vercel KV with no expiry (persisted indefinitely)');
-            } else {
-              console.log('💾 Data saved to Vercel KV (persist command failed, may have default TTL)');
+            } catch (ttlError) {
+              console.log('💾 Data saved to Vercel KV with 1-year TTL (TTL check failed)');
             }
+          } else {
+            const errorText = await setResponse.text();
+            console.error('❌ Failed to save to Vercel KV:', setResponse.status, errorText);
           }
         } catch (kvError) {
           console.warn('⚠️  Failed to save to Vercel KV:', kvError);
