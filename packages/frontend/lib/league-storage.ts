@@ -53,8 +53,11 @@ class LeagueStorageManager {
   private static instance: LeagueStorageManager;
   private storageKey = 'nfl_pickem_leagues_v1';
   private cache: PersistentStorage | null = null;
+  private version = 'DEBUG_v2.0'; // Version identifier to confirm deployment
 
-  private constructor() {}
+  private constructor() {
+    console.error('🚨🚨🚨 LeagueStorageManager INITIALIZED - VERSION:', this.version, '🚨🚨🚨');
+  }
 
   public static getInstance(): LeagueStorageManager {
     if (!LeagueStorageManager.instance) {
@@ -67,6 +70,9 @@ class LeagueStorageManager {
    * Get the default/seed data structure
    */
   private getDefaultData(): PersistentStorage {
+    console.error('🚨🚨🚨 GETDEFAULTDATA CALLED - OVERWRITING USER DATA! 🚨🚨🚨');
+    console.error('Stack trace:', new Error().stack);
+    
     const callStack = new Error().stack;
     const caller = callStack?.split('\n')[2]?.trim() || 'unknown';
     console.log(`🚨 getDefaultData() called from: ${caller}`);
@@ -116,13 +122,16 @@ class LeagueStorageManager {
    * Load data from persistent storage with multiple fallbacks
    */
   async loadData(): Promise<PersistentStorage> {
+    console.error('🚨🚨🚨 LOADDATA CALLED 🚨🚨🚨');
+    console.error('Stack trace:', new Error().stack);
+    
     const callStack = new Error().stack;
     const caller = callStack?.split('\n')[2]?.trim() || 'unknown';
     console.log(`🔍 loadData() called from: ${caller}`);
     
     // Return cached data if available
     if (this.cache) {
-      console.log('📱 Using cached data (no KV call needed)');
+      console.error('📱 Using cached data (no KV call needed)');
       return this.cache;
     }
 
