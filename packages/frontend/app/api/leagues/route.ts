@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, getPersistentUserId } from '@/lib/session-store';
 import { StorageAdapter } from '@/lib/storage-adapter';
+import { sanitizeForLogging } from '@/lib/log-utils';
 
 // Database-first approach with file storage fallback for reliability
 interface LeagueMember {
@@ -79,10 +80,6 @@ async function getUserFromRequest(request: NextRequest, bodyData?: any) {
   };
 }
 
-// Convert league to API format (now handled by StorageAdapter)
-function formatLeagueForAPI(league: any): League {
-  return league; // StorageAdapter returns properly formatted leagues
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -90,7 +87,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
 
-    console.log('📖 Persistent storage leagues API - Loading leagues, action:', action, 'user:', user.userId);
+    console.log('📖 Persistent storage leagues API - Loading leagues, action:', sanitizeForLogging(action), 'user:', sanitizeForLogging(user.userId));
 
     if (action === 'my-leagues') {
       console.log('🔍 Loading user leagues from persistent storage for:', user.userId);
@@ -165,7 +162,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log('✨ Creating league in persistent storage:', name, 'for user:', user.username);
+    console.log('✨ Creating league in persistent storage:', sanitizeForLogging(name), 'for user:', sanitizeForLogging(user.username));
 
     try {
       const newLeague = await StorageAdapter.createLeague({
@@ -178,8 +175,8 @@ export async function POST(request: NextRequest) {
         username: user.username
       });
 
-      console.log('✅ League created in persistent storage successfully:', newLeague.name);
-      console.log('📊 League ID:', newLeague.id);
+      console.log('✅ League created in persistent storage successfully:', sanitizeForLogging(newLeague.name));
+      console.log('📊 League ID:', sanitizeForLogging(newLeague.id));
       console.log('👥 Initial member count:', newLeague.memberCount);
 
       return NextResponse.json({
@@ -215,7 +212,7 @@ export async function PUT(request: NextRequest) {
     const { leagueId, action } = body;
 
     if (action === 'join') {
-      console.log('🤝 User joining league via persistent storage:', user.username, 'to league:', leagueId);
+      console.log('🤝 User joining league via persistent storage:', sanitizeForLogging(user.username), 'to league:', sanitizeForLogging(leagueId));
       
       try {
         const updatedLeague = await StorageAdapter.joinLeague(leagueId, user.userId, user.username);
@@ -247,7 +244,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (action === 'leave') {
-      console.log('👋 User leaving league via persistent storage:', user.username, 'from league:', leagueId);
+      console.log('👋 User leaving league via persistent storage:', sanitizeForLogging(user.username), 'from league:', sanitizeForLogging(leagueId));
       
       try {
         const success = await StorageAdapter.leaveLeague(leagueId, user.userId);

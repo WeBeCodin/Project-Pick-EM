@@ -2,6 +2,7 @@
 import { DatabaseService, prisma } from './database';
 import fs from 'fs/promises';
 import path from 'path';
+import { sanitizeForLogging } from './log-utils';
 
 // File-based storage for when database is not available
 const STORAGE_DIR = '/tmp/pickem-storage';
@@ -78,7 +79,8 @@ export class StorageAdapter {
   static async saveLeaguesToFile(leagues: League[]): Promise<void> {
     try {
       await this.ensureStorageDir();
-      await fs.writeFile(LEAGUES_FILE, JSON.stringify(leagues, null, 2));
+      // Use secure file permissions (0o600 = read/write for owner only)
+      await fs.writeFile(LEAGUES_FILE, JSON.stringify(leagues, null, 2), { mode: 0o600 });
       console.log('✅ Leagues saved to persistent file storage');
     } catch (error) {
       console.error('❌ Failed to save leagues to file:', error);
@@ -168,7 +170,7 @@ export class StorageAdapter {
     leagues.push(newLeague);
     await this.saveLeaguesToFile(leagues);
     
-    console.log('✅ League created in file storage:', newLeague.name);
+    console.log('✅ League created in file storage:', sanitizeForLogging(newLeague.name));
     return newLeague;
   }
 
@@ -221,7 +223,7 @@ export class StorageAdapter {
     league.updatedAt = new Date().toISOString();
 
     await this.saveLeaguesToFile(leagues);
-    console.log('✅ User joined league in file storage:', username, 'to', league.name);
+    console.log('✅ User joined league in file storage:', sanitizeForLogging(username), 'to', sanitizeForLogging(league.name));
     
     return league;
   }
