@@ -28,5 +28,16 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "packages/frontend/app/api/leagues/route.ts": {
+      "maxDuration": 30
+    },
+    "packages/frontend/app/api/picks/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  }
 }

@@ -55,3 +55,6 @@ tmp/
 .turbo/
 .vercel
 .netlify
+
+# Persistent storage (for file-based fallback)
+/tmp/pickem-storage/
