@@ -50,6 +50,15 @@ async function getUserFromRequest(request: NextRequest, bodyData?: any) {
     };
   }
   
+  // Handle user data for join/leave operations
+  if (bodyData?.userData) {
+    return {
+      userId: bodyData.userData.userId,
+      username: bodyData.userData.username,
+      email: bodyData.userData.email || ''
+    };
+  }
+  
   // Fallback to query params
   const url = new URL(request.url);
   const userId = url.searchParams.get('userId');
