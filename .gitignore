@@ -56,5 +56,8 @@ tmp/
 .vercel
 .netlify
 
+# TypeScript build info
+*.tsbuildinfo
+
 # Persistent storage (for file-based fallback)
 /tmp/pickem-storage/
