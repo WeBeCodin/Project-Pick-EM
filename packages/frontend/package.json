@@ -38,7 +38,7 @@
     "react-hook-form": "^7.62.0",
     "react-hot-toast": "^2.6.0",
     "tailwind-merge": "^2.6.0",
-    "zod": "^3.25.76",
+    "zod": "^4.1.9",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
