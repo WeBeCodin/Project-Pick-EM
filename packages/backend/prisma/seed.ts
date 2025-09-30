@@ -61,9 +61,9 @@ async function main() {
       
       // AFC West
       { name: 'Broncos', city: 'Denver', fullName: 'Denver Broncos', abbreviation: 'DEN', conference: 'AFC' as const, division: 'WEST' as const },
-      { name: 'Chiefs', city: 'Kansas City', fullName: 'Kansas City Chiefs', abbreviation: 'KC', conference: 'AFC' as const, division: 'WEST' as const },
+      { id: 'kc-chiefs-test-id', name: 'Chiefs', city: 'Kansas City', fullName: 'Kansas City Chiefs', abbreviation: 'KC', conference: 'AFC' as const, division: 'WEST' as const },
       { name: 'Raiders', city: 'Las Vegas', fullName: 'Las Vegas Raiders', abbreviation: 'LV', conference: 'AFC' as const, division: 'WEST' as const },
-      { name: 'Chargers', city: 'Los Angeles', fullName: 'Los Angeles Chargers', abbreviation: 'LAC', conference: 'AFC' as const, division: 'WEST' as const },
+      { id: 'la-chargers-test-id', name: 'Chargers', city: 'Los Angeles', fullName: 'Los Angeles Chargers', abbreviation: 'LAC', conference: 'AFC' as const, division: 'WEST' as const },
       
       // NFC East
       { name: 'Cowboys', city: 'Dallas', fullName: 'Dallas Cowboys', abbreviation: 'DAL', conference: 'NFC' as const, division: 'EAST' as const },
@@ -140,6 +140,36 @@ async function main() {
     });
 
     console.log('✅ Created demo user:', demoUser.email);
+
+    // Create a dedicated test user
+    const testUser = await prisma.user.upsert({
+      where: { id: 'test-user-123' },
+      update: {},
+      create: {
+        id: 'test-user-123',
+        email: 'test-user-123@test.com',
+        username: 'test-user-123',
+        password: 'password',
+        isActive: true,
+        emailVerified: true,
+      },
+    });
+    console.log('✅ Created test user:', testUser.email);
+
+    // Create a sample game for testing
+    const testGame = await prisma.game.upsert({
+      where: { id: 'test-game-123' },
+      update: {},
+      create: {
+        id: 'test-game-123',
+        weekId: week1.id,
+        homeTeamId: 'kc-chiefs-test-id',
+        awayTeamId: 'la-chargers-test-id',
+        kickoffTime: new Date('2025-09-07T20:20:00Z'),
+        status: 'SCHEDULED',
+      },
+    });
+    console.log('✅ Created test game:', testGame.id);
 
     // Create a demo league
     const demoLeague = await prisma.league.upsert({

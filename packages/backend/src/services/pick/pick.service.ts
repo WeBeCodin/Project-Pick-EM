@@ -88,20 +88,6 @@ export class PickService {
         throw new ValidationError('Selected team is not participating in this game');
       }
 
-      // Check if user exists (create if not exists for testing)
-      let user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user) {
-        user = await prisma.user.create({
-          data: {
-            id: userId,
-            email: `${userId}@test.com`,
-            username: `user_${userId}`,
-            password: 'temp_password' // Temporary for testing
-          }
-        });
-        logger.info(`Created test user: ${userId}`);
-      }
-
       // Upsert the pick (update if exists, create if doesn't)
       const pick = await prisma.pick.upsert({
         where: {
@@ -190,19 +176,6 @@ export class PickService {
         if (submission.selectedTeamId !== game.homeTeamId && submission.selectedTeamId !== game.awayTeamId) {
           throw new ValidationError(`Selected team ${submission.selectedTeamId} is not participating in game ${submission.gameId}`);
         }
-      }
-
-      // Ensure user exists
-      let user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user) {
-        user = await prisma.user.create({
-          data: {
-            id: userId,
-            email: `${userId}@test.com`,
-            username: `user_${userId}`,
-            password: 'temp_password' // Temporary for testing
-          }
-        });
       }
 
       // Create a map for quick game lookup
