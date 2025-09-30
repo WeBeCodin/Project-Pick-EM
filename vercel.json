@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "packages/frontend/.next",
+  "buildCommand": "npm install --include=dev && npx prisma generate && npm run build",
+  "outputDirectory": ".next",
   "framework": "nextjs",
-  "installCommand": "npm install && cd packages/frontend && npm install --legacy-peer-deps",
+  "installCommand": "npm install --include=dev --legacy-peer-deps",
+  "rootDirectory": "packages/frontend",
   "github": {
     "enabled": true,
     "autoAlias": true,
