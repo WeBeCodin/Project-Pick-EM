@@ -1,6 +1,7 @@
-import { Router } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { leagueService } from '../services/league/league.service';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthenticatedRequest, optionalAuth } from '../middleware/auth';
+import { AppError } from '../utils/errors';
 
 const router = Router();
 
@@ -9,9 +10,10 @@ const router = Router();
  * @desc    Create a new league
  * @access  Private
  */
-router.post('/', authenticateToken, async (req: any, res: any, next: any) => {
+router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id || req.headers['x-user-id'] || 'demo-user';
+    // The authenticateToken middleware now guarantees req.user exists.
+    const userId = req.user!.id;
     const league = await leagueService.createLeague(userId, req.body);
 
     res.status(201).json({
@@ -29,16 +31,13 @@ router.post('/', authenticateToken, async (req: any, res: any, next: any) => {
  * @desc    Join a league by code
  * @access  Private
  */
-router.post('/join', authenticateToken, async (req: any, res: any, next: any) => {
+router.post('/join', authenticateToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id || req.headers['x-user-id'] || 'demo-user';
+    const userId = req.user!.id;
     const { code } = req.body;
     
     if (!code) {
-      return res.status(400).json({
-        success: false,
-        error: 'League code is required'
-      });
+      throw new AppError('League code is required', 400);
     }
 
     const league = await leagueService.joinLeague({
@@ -61,9 +60,9 @@ router.post('/join', authenticateToken, async (req: any, res: any, next: any) =>
  * @desc    Get user's leagues
  * @access  Private
  */
-router.get('/my-leagues', authenticateToken, async (req: any, res: any, next: any) => {
+router.get('/my-leagues', authenticateToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id || req.headers['x-user-id'] || 'demo-user';
+    const userId = req.user!.id;
     const leagues = await leagueService.getUserLeagues(userId);
 
     res.json({
@@ -81,7 +80,7 @@ router.get('/my-leagues', authenticateToken, async (req: any, res: any, next: an
  * @desc    Get public leagues
  * @access  Public
  */
-router.get('/public', async (req: any, res: any, next: any) => {
+router.get('/public', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
     const leagues = await leagueService.getPublicLeagues(Math.min(limit, 50));
@@ -101,27 +100,21 @@ router.get('/public', async (req: any, res: any, next: any) => {
  * @desc    Get league by ID
  * @access  Public/Private based on league privacy
  */
-router.get('/:id', async (req: any, res: any, next: any) => {
+router.get('/:id', optionalAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const league = await leagueService.getLeagueById(id);
 
     // If league is private, check if user is a member
     if (league.isPrivate) {
-      const userId = req.user?.id || req.headers['x-user-id'];
+      const userId = req.user?.id;
       if (!userId) {
-        return res.status(403).json({
-          success: false,
-          error: 'This is a private league'
-        });
+        throw new AppError('This is a private league. Authentication required.', 403);
       }
 
       const isMember = await leagueService.isUserMember(userId, id);
       if (!isMember) {
-        return res.status(403).json({
-          success: false,
-          error: 'Access denied to private league'
-        });
+        throw new AppError('Access denied to private league. You are not a member.', 403);
       }
     }
 
@@ -139,9 +132,9 @@ router.get('/:id', async (req: any, res: any, next: any) => {
  * @desc    Leave a league
  * @access  Private
  */
-router.delete('/:id/leave', authenticateToken, async (req: any, res: any, next: any) => {
+router.delete('/:id/leave', authenticateToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id || req.headers['x-user-id'] || 'demo-user';
+    const userId = req.user!.id;
     const { id } = req.params;
     
     await leagueService.leaveLeague(userId, id);
