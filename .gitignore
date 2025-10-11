@@ -61,3 +61,4 @@ tmp/
 
 # Persistent storage (for file-based fallback)
 /tmp/pickem-storage/
+*.tsbuildinfo
