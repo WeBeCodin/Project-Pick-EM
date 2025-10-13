@@ -49,6 +49,7 @@ model User {
   notifications  Notification[]
   auditLogs      AuditLog[]
   messages       LeagueMessage[]
+  predictions    Prediction[]
 
   @@index([email])
   @@index([username])
@@ -255,11 +256,13 @@ model Game {
   updatedAt       DateTime @updatedAt
 
   // Relations
-  week              Week   @relation(fields: [weekId], references: [id])
-  homeTeam          Team   @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam          Team   @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  week              Week         @relation(fields: [weekId], references: [id])
+  homeTeam          Team         @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam          Team         @relation("AwayTeam", fields: [awayTeamId], references: [id])
   picks             Pick[]
-  tiebreakerForWeek Week?  @relation("TiebreakerGame")
+  tiebreakerForWeek Week?        @relation("TiebreakerGame")
+  predictions       Prediction[]
+  spreads           GameSpread[]
 
   @@unique([weekId, espnGameId])
   @@unique([weekId, cbsGameId])
@@ -370,6 +373,11 @@ model League {
   allowLateJoin Boolean       @default(true) // Can join after season starts
   scoringSystem ScoringSystem @default(STANDARD)
 
+  // Lock system configuration
+  enableLocks Boolean @default(false) // Enable single-game locks per week
+  lockBonus   Int     @default(20) // Bonus points for correct locked pick
+  lockPenalty Int     @default(15) // Penalty points for incorrect locked pick
+
   // Creator
   createdById String @db.Uuid
 
@@ -379,10 +387,11 @@ model League {
   deletedAt DateTime? // Soft delete
 
   // Relations
-  season   Season          @relation(fields: [seasonId], references: [id])
-  creator  User            @relation("LeagueCreator", fields: [createdById], references: [id])
-  members  UserLeague[]
-  messages LeagueMessage[]
+  season      Season          @relation(fields: [seasonId], references: [id])
+  creator     User            @relation("LeagueCreator", fields: [createdById], references: [id])
+  members     UserLeague[]
+  messages    LeagueMessage[]
+  predictions Prediction[]
 
   @@index([code])
   @@index([seasonId])
@@ -648,4 +657,95 @@ model RssFeedLog {
   @@index([success])
   @@index([feedType])
   @@map("rss_feed_logs")
+}
+
+// ==========================================
+// EVENT SOURCING & DATA PROTECTION
+// ==========================================
+
+model Event {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aggregateType String   @db.VarChar(50) // picks, leagues, users, games
+  aggregateId   String   @db.VarChar(100) // UUID or identifier
+  eventType     String   @db.VarChar(100) // PICK_CREATED, PICK_UPDATED, etc.
+  payload       Json // Event data
+  createdAt     DateTime @default(now()) @db.Timestamptz
+
+  @@index([aggregateType, aggregateId, createdAt])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("events")
+}
+
+model Snapshot {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aggregateType String   @db.VarChar(50)
+  aggregateId   String   @db.VarChar(100)
+  state         Json // Snapshot of aggregate state
+  lastEventId   String   @db.Uuid // Last event included in snapshot
+  createdAt     DateTime @default(now()) @db.Timestamptz
+
+  @@unique([aggregateType, aggregateId, createdAt])
+  @@index([aggregateType, aggregateId])
+  @@index([createdAt])
+  @@map("snapshots")
+}
+
+// ==========================================
+// PREDICTIONS & SCORING
+// ==========================================
+
+model Prediction {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId   String @db.Uuid
+  leagueId String @db.Uuid
+  gameId   String @db.Uuid
+
+  // Score predictions
+  predictedHomeScore Int
+  predictedAwayScore Int
+
+  // Spread usage
+  useSpread Boolean @default(false) // Whether to apply spread to scoring
+
+  // Lock system
+  locked Boolean @default(false) // Is this pick locked for bonus/penalty
+
+  // Computed scores (cached after game completes)
+  winnerPoints  Int? // 10 for correct winner
+  accuracyScore Int? // Margin accuracy bonus
+  lockBonus     Int? // Bonus/penalty for locked picks
+  totalScore    Int? // Total computed score
+
+  // Metadata
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  scoredAt  DateTime? // When scoring was computed
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId, leagueId])
+  @@index([userId, leagueId])
+  @@index([gameId])
+  @@index([locked])
+  @@map("predictions")
+}
+
+model GameSpread {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  gameId    String   @db.Uuid
+  spread    Float // Positive means home team favored
+  source    String   @db.VarChar(100) // RSS feed source
+  fetchedAt DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, source])
+  @@index([gameId])
+  @@index([fetchedAt])
+  @@map("game_spreads")
 }

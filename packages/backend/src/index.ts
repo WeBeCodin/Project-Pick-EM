@@ -7,10 +7,13 @@ import { logger } from './utils/logger';
 import { testDatabaseConnection } from './database';
 import { cacheService } from './services/cache/cache.service';
 import { startRSSCronJobs } from './services/rss/cron';
+import { startReconciliationJob } from './services/reconciliation/cron';
+import { startSpreadFetcherJob } from './services/rss/spread-fetcher-cron';
 import adminRoutes from './routes/admin.routes';
 import { pickRoutes } from './routes/pick.routes';
 import { authRoutes } from './routes/auth.routes';
 import leagueRoutes from './routes/league.routes';
+import predictionsRoutes from './routes/predictions.routes';
 import { errorHandler } from './utils/errors';
 
 const app = express();
@@ -51,6 +54,7 @@ app.get('/health', async (_req, res) => {
 app.use('/api/admin', adminRoutes);
 app.use('/api/v1/picks', pickRoutes);
 app.use('/api/v1/leagues', leagueRoutes);
+app.use('/api/v1/predictions', predictionsRoutes);
 app.use('/auth', authRoutes);
 
 // Error handling middleware
@@ -80,6 +84,14 @@ async function startServer() {
       startRSSCronJobs();
       logger.info('RSS cron jobs started');
     }
+
+    // Start reconciliation cron job
+    startReconciliationJob();
+    logger.info('Reconciliation cron job started');
+
+    // Start spread fetcher cron job
+    startSpreadFetcherJob();
+    logger.info('Spread fetcher cron job started');
 
     // Start HTTP server
     app.listen(PORT, () => {

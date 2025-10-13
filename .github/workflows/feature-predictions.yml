@@ -1,0 +1,190 @@
+name: Feature - Predictions & Event Sourcing
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test-predictions:
+    name: Test Predictions Feature
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pickem
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: nfl_pickem_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup test environment
+        working-directory: packages/backend
+        run: |
+          cp ../../.env.example .env
+          echo "DATABASE_URL=postgresql://pickem:password@localhost:5432/nfl_pickem_test" >> .env
+          echo "REDIS_URL=redis://localhost:6379" >> .env
+
+      - name: Run Prisma migrations
+        working-directory: packages/backend
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://pickem:password@localhost:5432/nfl_pickem_test
+
+      - name: Run scoring tests
+        working-directory: packages/backend
+        run: npm test -- src/services/scoring/__tests__/scoring.service.test.ts --coverage
+        env:
+          DATABASE_URL: postgresql://pickem:password@localhost:5432/nfl_pickem_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Run predictions lock tests
+        working-directory: packages/backend
+        run: npm test -- src/services/predictions/__tests__/predictions-locks.test.ts --coverage
+        env:
+          DATABASE_URL: postgresql://pickem:password@localhost:5432/nfl_pickem_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Check test coverage (>90% for scoring)
+        working-directory: packages/backend
+        run: |
+          npm test -- src/services/scoring/__tests__/scoring.service.test.ts --coverage --coverageThreshold='{"global":{"branches":90,"functions":90,"lines":90,"statements":90}}'
+        env:
+          DATABASE_URL: postgresql://pickem:password@localhost:5432/nfl_pickem_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./packages/backend/coverage/coverage-final.json
+          flags: predictions
+          name: predictions-coverage
+
+  lint-typecheck:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        working-directory: packages/backend
+        run: npx prisma generate
+
+      - name: Lint backend
+        working-directory: packages/backend
+        run: npm run lint
+
+      - name: Type check backend
+        working-directory: packages/backend
+        run: npx tsc --noEmit
+
+  validate-schema:
+    name: Validate Database Schema
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pickem
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: nfl_pickem_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        working-directory: packages/backend
+        run: npx prisma validate
+
+      - name: Check migrations
+        working-directory: packages/backend
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://pickem:password@localhost:5432/nfl_pickem_test
+
+      - name: Verify new tables created
+        working-directory: packages/backend
+        run: |
+          npx prisma db execute --stdin <<EOF
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = 'events'
+          );
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = 'snapshots'
+          );
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = 'predictions'
+          );
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = 'game_spreads'
+          );
+          EOF
+        env:
+          DATABASE_URL: postgresql://pickem:password@localhost:5432/nfl_pickem_test

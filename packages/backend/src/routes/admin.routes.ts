@@ -3,6 +3,9 @@ import { rssParserService } from '../services/rss/rss-parser.service';
 import { manualRSSSync, getRSSStatus } from '../services/rss/cron';
 import { MockNFLService } from '../services/rss/mock-nfl.service';
 import { logger } from '../utils/logger';
+import { runReconciliationNow } from '../services/reconciliation/cron';
+import { runSpreadFetchNow } from '../services/rss/spread-fetcher-cron';
+import { scoringService } from '../services/scoring/scoring.service';
 
 const router = Router();
 
@@ -227,6 +230,87 @@ router.post('/nfl/create-week1', async (_req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to create Week 1 games',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Reconciliation endpoints
+router.post('/reconcile', async (_req, res) => {
+  try {
+    logger.info('Admin request: Manual reconciliation');
+    const result = await runReconciliationNow();
+    res.json({
+      success: true,
+      data: result,
+      message: 'Reconciliation completed successfully'
+    });
+  } catch (error) {
+    logger.error('Error running reconciliation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to run reconciliation',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Spread fetcher endpoints
+router.post('/spreads/fetch', async (_req, res) => {
+  try {
+    logger.info('Admin request: Manual spread fetch');
+    const result = await runSpreadFetchNow();
+    res.json({
+      success: true,
+      data: result,
+      message: 'Spread fetch completed'
+    });
+  } catch (error) {
+    logger.error('Error fetching spreads:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch spreads',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Scoring endpoints
+router.post('/scores/compute/:weekId', async (req, res) => {
+  try {
+    const { weekId } = req.params;
+    logger.info('Admin request: Compute scores for week', { weekId });
+    const result = await scoringService.computeScoresForWeek(weekId);
+    res.json({
+      success: true,
+      data: result,
+      message: 'Scores computed successfully'
+    });
+  } catch (error) {
+    logger.error('Error computing scores:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to compute scores',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+router.post('/scores/compute/game/:gameId', async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    logger.info('Admin request: Compute scores for game', { gameId });
+    const result = await scoringService.computeScoresForGame(gameId);
+    res.json({
+      success: true,
+      data: result,
+      message: 'Scores computed successfully for game'
+    });
+  } catch (error) {
+    logger.error('Error computing scores for game:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to compute scores for game',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
