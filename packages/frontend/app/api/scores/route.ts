@@ -1,103 +1,307 @@
 import { NextResponse } from 'next/server';
 
 /**
- * ESPN NFL Scoreboard API proxy
- * Fetches live NFL scores, game status, and real-time updates
+ * NFL Scoreboard API - Week 7 Test Data
+ * Returns upcoming Week 7 games for testing picks functionality
  */
 export async function GET() {
   try {
-    // ESPN's public NFL scoreboard API
-    const espnResponse = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard', {
-      headers: {
-        'User-Agent': 'NFL-PickEm-App/1.0',
-      },
-      // Cache for 30 seconds to avoid rate limiting
-      next: { revalidate: 30 }
-    });
-
-    if (!espnResponse.ok) {
-      throw new Error(`ESPN API error: ${espnResponse.status}`);
-    }
-
-    const data = await espnResponse.json();
-    
-    // Transform ESPN data to our app format
-    const games = data.events?.map((event: any) => {
-      const competition = event.competitions[0];
-      const homeTeam = competition.competitors.find((team: any) => team.homeAway === 'home');
-      const awayTeam = competition.competitors.find((team: any) => team.homeAway === 'away');
-      
-      return {
-        id: event.id,
-        name: event.name,
-        shortName: event.shortName,
-        date: event.date,
-        week: event.week?.number || 1,
-        season: event.season?.year || 2025,
-        
-        // Game status and timing
+    // Week 7 upcoming games - Oct 17-21, 2025
+    const games = [
+      {
+        id: 'game_nfl_7_1',
+        name: 'Kansas City Chiefs at San Francisco 49ers',
+        shortName: 'KC @ SF',
+        date: '2025-10-17T00:20:00Z',
+        week: 7,
+        season: 2025,
         status: {
-          state: competition.status.type.state, // 'pre', 'in', 'post'
-          completed: competition.status.type.completed,
-          description: competition.status.type.description,
-          detail: competition.status.type.detail,
-          shortDetail: competition.status.type.shortDetail,
-          clock: competition.status.displayClock,
-          period: competition.status.period,
+          state: 'pre',
+          completed: false,
+          description: 'Scheduled',
+          detail: 'Thu, Oct 16 - 8:20 PM ET',
+          shortDetail: 'Thu 8:20 PM',
+          clock: '0:00',
+          period: 0,
         },
-        
-        // Teams and scores
         homeTeam: {
-          id: homeTeam.team.id,
-          name: homeTeam.team.name,
-          displayName: homeTeam.team.displayName,
-          abbreviation: homeTeam.team.abbreviation,
-          color: homeTeam.team.color,
-          logo: homeTeam.team.logo,
-          score: parseInt(homeTeam.score || '0'),
-          records: homeTeam.records?.[0]?.summary || '0-0',
+          id: 'sf',
+          name: '49ers',
+          displayName: 'San Francisco 49ers',
+          abbreviation: 'SF',
+          color: 'AA0000',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/sf.png',
+          score: 0,
+          records: '3-3',
         },
-        
         awayTeam: {
-          id: awayTeam.team.id,
-          name: awayTeam.team.name,
-          displayName: awayTeam.team.displayName,
-          abbreviation: awayTeam.team.abbreviation,
-          color: awayTeam.team.color,
-          logo: awayTeam.team.logo,
-          score: parseInt(awayTeam.score || '0'),
-          records: awayTeam.records?.[0]?.summary || '0-0',
+          id: 'kc',
+          name: 'Chiefs',
+          displayName: 'Kansas City Chiefs',
+          abbreviation: 'KC',
+          color: 'E31837',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/kc.png',
+          score: 0,
+          records: '5-1',
         },
-        
-        // Broadcasting info
-        broadcast: competition.broadcasts?.[0]?.names?.[0] || '',
-        venue: {
-          name: competition.venue?.fullName || '',
-          city: competition.venue?.address?.city || '',
-          state: competition.venue?.address?.state || '',
+        broadcast: 'Amazon Prime Video',
+        venue: { name: "Levi's Stadium", city: 'Santa Clara', state: 'CA' },
+        weather: null,
+        odds: { spread: -3.5, overUnder: 47.5, homeMoneyline: -175, awayMoneyline: 150 },
+      },
+      {
+        id: 'game_nfl_7_2',
+        name: 'Baltimore Ravens at Tampa Bay Buccaneers',
+        shortName: 'BAL @ TB',
+        date: '2025-10-19T17:00:00Z',
+        week: 7,
+        season: 2025,
+        status: {
+          state: 'pre',
+          completed: false,
+          description: 'Scheduled',
+          detail: 'Sun, Oct 19 - 1:00 PM ET',
+          shortDetail: 'Sun 1:00 PM',
+          clock: '0:00',
+          period: 0,
         },
-        
-        // Weather (if available)
-        weather: event.weather ? {
-          temperature: event.weather.temperature,
-          condition: event.weather.displayValue,
-        } : null,
-        
-        // Betting odds (if available)
-        odds: competition.odds?.[0] ? {
-          spread: competition.odds[0].spread,
-          overUnder: competition.odds[0].overUnder,
-          homeMoneyline: competition.odds[0].homeTeamOdds?.moneyLine,
-          awayMoneyline: competition.odds[0].awayTeamOdds?.moneyLine,
-        } : null,
-      };
-    }) || [];
+        homeTeam: {
+          id: 'tb',
+          name: 'Buccaneers',
+          displayName: 'Tampa Bay Buccaneers',
+          abbreviation: 'TB',
+          color: 'D50A0A',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/tb.png',
+          score: 0,
+          records: '4-2',
+        },
+        awayTeam: {
+          id: 'bal',
+          name: 'Ravens',
+          displayName: 'Baltimore Ravens',
+          abbreviation: 'BAL',
+          color: '241773',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/bal.png',
+          score: 0,
+          records: '4-2',
+        },
+        broadcast: 'CBS',
+        venue: { name: 'Raymond James Stadium', city: 'Tampa', state: 'FL' },
+        weather: null,
+        odds: { spread: 2.5, overUnder: 49.5, homeMoneyline: 125, awayMoneyline: -145 },
+      },
+      {
+        id: 'game_nfl_7_3',
+        name: 'Indianapolis Colts at Miami Dolphins',
+        shortName: 'IND @ MIA',
+        date: '2025-10-19T17:00:00Z',
+        week: 7,
+        season: 2025,
+        status: {
+          state: 'pre',
+          completed: false,
+          description: 'Scheduled',
+          detail: 'Sun, Oct 19 - 1:00 PM ET',
+          shortDetail: 'Sun 1:00 PM',
+          clock: '0:00',
+          period: 0,
+        },
+        homeTeam: {
+          id: 'mia',
+          name: 'Dolphins',
+          displayName: 'Miami Dolphins',
+          abbreviation: 'MIA',
+          color: '008E97',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/mia.png',
+          score: 0,
+          records: '2-4',
+        },
+        awayTeam: {
+          id: 'ind',
+          name: 'Colts',
+          displayName: 'Indianapolis Colts',
+          abbreviation: 'IND',
+          color: '002C5F',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/ind.png',
+          score: 0,
+          records: '3-3',
+        },
+        broadcast: 'FOX',
+        venue: { name: 'Hard Rock Stadium', city: 'Miami Gardens', state: 'FL' },
+        weather: null,
+        odds: { spread: -1.5, overUnder: 44.5, homeMoneyline: -120, awayMoneyline: 100 },
+      },
+      {
+        id: 'game_nfl_7_4',
+        name: 'Cleveland Browns at Cincinnati Bengals',
+        shortName: 'CLE @ CIN',
+        date: '2025-10-19T17:00:00Z',
+        week: 7,
+        season: 2025,
+        status: {
+          state: 'pre',
+          completed: false,
+          description: 'Scheduled',
+          detail: 'Sun, Oct 19 - 1:00 PM ET',
+          shortDetail: 'Sun 1:00 PM',
+          clock: '0:00',
+          period: 0,
+        },
+        homeTeam: {
+          id: 'cin',
+          name: 'Bengals',
+          displayName: 'Cincinnati Bengals',
+          abbreviation: 'CIN',
+          color: 'FB4F14',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/cin.png',
+          score: 0,
+          records: '3-3',
+        },
+        awayTeam: {
+          id: 'cle',
+          name: 'Browns',
+          displayName: 'Cleveland Browns',
+          abbreviation: 'CLE',
+          color: '311D00',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/cle.png',
+          score: 0,
+          records: '1-5',
+        },
+        broadcast: 'CBS',
+        venue: { name: 'Paycor Stadium', city: 'Cincinnati', state: 'OH' },
+        weather: null,
+        odds: { spread: -6.5, overUnder: 41.5, homeMoneyline: -280, awayMoneyline: 230 },
+      },
+      {
+        id: 'game_nfl_7_5',
+        name: 'Minnesota Vikings at Detroit Lions',
+        shortName: 'MIN @ DET',
+        date: '2025-10-19T17:00:00Z',
+        week: 7,
+        season: 2025,
+        status: {
+          state: 'pre',
+          completed: false,
+          description: 'Scheduled',
+          detail: 'Sun, Oct 19 - 1:00 PM ET',
+          shortDetail: 'Sun 1:00 PM',
+          clock: '0:00',
+          period: 0,
+        },
+        homeTeam: {
+          id: 'det',
+          name: 'Lions',
+          displayName: 'Detroit Lions',
+          abbreviation: 'DET',
+          color: '0076B6',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/det.png',
+          score: 0,
+          records: '4-2',
+        },
+        awayTeam: {
+          id: 'min',
+          name: 'Vikings',
+          displayName: 'Minnesota Vikings',
+          abbreviation: 'MIN',
+          color: '4F2683',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/min.png',
+          score: 0,
+          records: '5-1',
+        },
+        broadcast: 'FOX',
+        venue: { name: 'Ford Field', city: 'Detroit', state: 'MI' },
+        weather: null,
+        odds: { spread: 1.5, overUnder: 52.5, homeMoneyline: -115, awayMoneyline: -105 },
+      },
+      {
+        id: 'game_nfl_7_6',
+        name: 'Green Bay Packers at Houston Texans',
+        shortName: 'GB @ HOU',
+        date: '2025-10-19T17:00:00Z',
+        week: 7,
+        season: 2025,
+        status: {
+          state: 'pre',
+          completed: false,
+          description: 'Scheduled',
+          detail: 'Sun, Oct 19 - 1:00 PM ET',
+          shortDetail: 'Sun 1:00 PM',
+          clock: '0:00',
+          period: 0,
+        },
+        homeTeam: {
+          id: 'hou',
+          name: 'Texans',
+          displayName: 'Houston Texans',
+          abbreviation: 'HOU',
+          color: '03202F',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/hou.png',
+          score: 0,
+          records: '5-1',
+        },
+        awayTeam: {
+          id: 'gb',
+          name: 'Packers',
+          displayName: 'Green Bay Packers',
+          abbreviation: 'GB',
+          color: '203731',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/gb.png',
+          score: 0,
+          records: '4-2',
+        },
+        broadcast: 'CBS',
+        venue: { name: 'NRG Stadium', city: 'Houston', state: 'TX' },
+        weather: null,
+        odds: { spread: -4.5, overUnder: 48.5, homeMoneyline: -200, awayMoneyline: 170 },
+      },
+      {
+        id: 'game_nfl_7_7',
+        name: 'New York Giants at Philadelphia Eagles',
+        shortName: 'NYG @ PHI',
+        date: '2025-10-20T00:20:00Z',
+        week: 7,
+        season: 2025,
+        status: {
+          state: 'pre',
+          completed: false,
+          description: 'Scheduled',
+          detail: 'Sun, Oct 19 - 8:20 PM ET',
+          shortDetail: 'Sun 8:20 PM',
+          clock: '0:00',
+          period: 0,
+        },
+        homeTeam: {
+          id: 'phi',
+          name: 'Eagles',
+          displayName: 'Philadelphia Eagles',
+          abbreviation: 'PHI',
+          color: '004C54',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/phi.png',
+          score: 0,
+          records: '4-2',
+        },
+        awayTeam: {
+          id: 'nyg',
+          name: 'Giants',
+          displayName: 'New York Giants',
+          abbreviation: 'NYG',
+          color: '0B2265',
+          logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png',
+          score: 0,
+          records: '2-4',
+        },
+        broadcast: 'NBC',
+        venue: { name: 'Lincoln Financial Field', city: 'Philadelphia', state: 'PA' },
+        weather: null,
+        odds: { spread: -7.5, overUnder: 43.5, homeMoneyline: -340, awayMoneyline: 280 },
+      },
+    ];
 
     return NextResponse.json({
       games,
       lastUpdated: new Date().toISOString(),
-      week: data.week?.number || 1,
-      season: data.season?.year || 2025,
+      week: 7,
+      season: 2025,
     });
 
   } catch (error) {
