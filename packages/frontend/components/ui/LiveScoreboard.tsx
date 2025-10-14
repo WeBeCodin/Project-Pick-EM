@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useLiveScores, formatGameStatus, isGameLive } from '@/hooks/useLiveScores';
-import { PickModal } from '@/components/ui/PickModal';
+import { PredictionForm, PredictionData } from '@/components/ui/PredictionForm';
 import { Button } from '@/components/ui/button';
 import { Target } from 'lucide-react';
 
@@ -75,6 +75,9 @@ export function LiveScoreboard({
   const [selectedGame, setSelectedGame] = useState<any>(null);
   const [isPickModalOpen, setIsPickModalOpen] = useState(false);
   const [userPicks, setUserPicks] = useState<Record<string, { selectedTeam: 'home' | 'away'; confidence: number }>>({});
+  const [userPredictions, setUserPredictions] = useState<Record<string, any>>({});
+  const [lockInfo, setLockInfo] = useState<any[]>([]);
+  const [userHasLockedThisWeek, setUserHasLockedThisWeek] = useState(false);
 
   // Load existing picks on component mount and when page becomes visible
   React.useEffect(() => {
@@ -115,9 +118,10 @@ export function LiveScoreboard({
     }
 
     try {
-      const response = await fetch(`/api/picks?leagueId=${leagueId}&userId=${userId}`);
-      if (response.ok) {
-        const result = await response.json();
+      // Load old-style picks
+      const picksResponse = await fetch(`/api/picks?leagueId=${leagueId}&userId=${userId}`);
+      if (picksResponse.ok) {
+        const result = await picksResponse.json();
         if (result.success && result.data && result.data.picks) {
           const picksMap = result.data.picks.reduce((acc: any, pick: any) => {
             acc[pick.gameId] = {
@@ -130,8 +134,84 @@ export function LiveScoreboard({
           console.log(`📦 Loaded ${result.data.picks.length} picks for league ${leagueId}`);
         }
       }
+
+      // Load new-style predictions with locks
+      const predictionsResponse = await fetch(`/api/predictions?userId=${userId}&leagueId=${leagueId}`);
+      if (predictionsResponse.ok) {
+        const result = await predictionsResponse.json();
+        if (result.success && result.data) {
+          const predictionsMap = result.data.reduce((acc: any, pred: any) => {
+            acc[pred.gameId] = pred;
+            return acc;
+          }, {});
+          setUserPredictions(predictionsMap);
+          
+          // Check if user has locked any game this week
+          const hasLock = result.data.some((pred: any) => pred.locked);
+          setUserHasLockedThisWeek(hasLock);
+          console.log(`🔮 Loaded ${result.data.length} predictions for league ${leagueId}`);
+        }
+      }
+
+      // Load lock info
+      const currentWeek = games[0]?.week || 7;
+      const locksResponse = await fetch(`/api/predictions/locks?leagueId=${leagueId}&weekId=week-${currentWeek}`);
+      if (locksResponse.ok) {
+        const result = await locksResponse.json();
+        if (result.success && result.data) {
+          setLockInfo(result.data.locks || []);
+        }
+      }
     } catch (error) {
       console.error('Error loading picks:', error);
+    }
+  };
+
+  const handlePredictionSubmit = async (prediction: PredictionData) => {
+    if (!leagueId || !userId) {
+      console.error('❌ Cannot submit prediction: leagueId or userId missing');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/predictions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...prediction,
+          userId,
+          leagueId,
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Update local state
+        setUserPredictions(prev => ({
+          ...prev,
+          [prediction.gameId]: result.data
+        }));
+        
+        if (prediction.locked) {
+          setUserHasLockedThisWeek(true);
+        }
+        
+        console.log(`✅ Prediction submitted for game ${prediction.gameId}`);
+        
+        // Reload all picks to get latest state
+        await loadUserPicks();
+        
+        // Call the callback to update parent component
+        onPickSubmitted?.();
+      } else {
+        throw new Error('Failed to submit prediction');
+      }
+    } catch (error) {
+      console.error('Error submitting prediction:', error);
+      throw error;
     }
   };
 
@@ -280,14 +360,29 @@ export function LiveScoreboard({
         </div>
       )}
 
-      {/* Pick Modal */}
-      {enablePicks && (
-        <PickModal
-          game={selectedGame}
+      {/* Prediction Form Modal */}
+      {enablePicks && selectedGame && (
+        <PredictionForm
+          game={{
+            id: selectedGame.id,
+            homeTeam: selectedGame.homeTeam,
+            awayTeam: selectedGame.awayTeam,
+            kickoffTime: selectedGame.date,
+            week: { id: `week-${selectedGame.week}`, weekNumber: selectedGame.week },
+            status: selectedGame.status.state,
+          }}
+          leagueId={leagueId || 'default-league'}
+          userId={userId || 'anonymous'}
           isOpen={isPickModalOpen}
           onClose={closePickModal}
-          onSubmit={handlePickSubmit}
-          existingPick={selectedGame ? userPicks[selectedGame.id] : undefined}
+          onSubmit={handlePredictionSubmit}
+          existingPrediction={selectedGame ? userPredictions[selectedGame.id] : undefined}
+          spread={undefined} // TODO: Add spread data
+          locksEnabled={true}
+          lockBonus={20}
+          lockPenalty={15}
+          isGameLockedByOther={false}
+          userHasLockedThisWeek={userHasLockedThisWeek}
         />
       )}
     </div>
