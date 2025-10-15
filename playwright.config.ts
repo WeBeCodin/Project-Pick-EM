@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: './tests',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -15,6 +15,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
+  /* Output directory for test artifacts */
+  outputDir: './test-results',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -22,44 +24,80 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+    
+    /* Screenshot settings */
+    screenshot: 'only-on-failure',
+    
+    /* Video settings */
+    video: 'retain-on-failure',
   },
 
-  /* Configure projects for major browsers */
+  /* Visual regression test configuration */
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixels: 100,
+      threshold: 0.2,
+    },
+  },
+
+  /* Configure projects for major browsers and viewports */
   projects: [
+    // Desktop viewports
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'chromium-desktop',
+      use: { 
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+      },
+      testMatch: /.*\.(spec|test)\.[jt]sx?$/,
     },
 
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: 'firefox-desktop',
+      use: { 
+        ...devices['Desktop Firefox'],
+        viewport: { width: 1280, height: 720 },
+      },
+      testMatch: /.*\.e2e\.(spec|test)\.[jt]sx?$/,
     },
 
     {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      name: 'webkit-desktop',
+      use: { 
+        ...devices['Desktop Safari'],
+        viewport: { width: 1280, height: 720 },
+      },
+      testMatch: /.*\.e2e\.(spec|test)\.[jt]sx?$/,
     },
 
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
+    // Tablet viewport
+    {
+      name: 'tablet',
+      use: {
+        ...devices['iPad Pro'],
+        viewport: { width: 1024, height: 768 },
+      },
+      testMatch: /.*\.visual\.(spec|test)\.[jt]sx?$/,
+    },
 
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
+    // Mobile viewports
+    {
+      name: 'mobile-chrome',
+      use: { 
+        ...devices['Pixel 5'],
+        viewport: { width: 393, height: 851 },
+      },
+      testMatch: /.*\.visual\.(spec|test)\.[jt]sx?$/,
+    },
+
+    {
+      name: 'mobile-safari',
+      use: { 
+        ...devices['iPhone 12'],
+        viewport: { width: 390, height: 844 },
+      },
+      testMatch: /.*\.visual\.(spec|test)\.[jt]sx?$/,
+    },
   ],
 
   // Note: webServer is disabled for CI - servers are started manually in GitHub Actions
