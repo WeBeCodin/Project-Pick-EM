@@ -7,7 +7,10 @@ node_modules/
 coverage/
 *.lcov
 .nyc_output
-test-results/
+test-results/*
+!test-results/baseline/
+test-results/baseline/*
+!test-results/baseline/README.md
 playwright-report/
 design-reviews/
 
