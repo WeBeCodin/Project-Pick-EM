@@ -7,6 +7,9 @@ node_modules/
 coverage/
 *.lcov
 .nyc_output
+test-results/
+playwright-report/
+design-reviews/
 
 # Production builds
 dist/
@@ -62,3 +65,9 @@ tmp/
 # Persistent storage (for file-based fallback)
 /tmp/pickem-storage/
 *.tsbuildinfo
+
+# Claude agent cache
+.claude/cache/
+
+# Design review artifacts
+design-review-report.md
