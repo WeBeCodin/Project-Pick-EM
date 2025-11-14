@@ -14,6 +14,8 @@ import { pickRoutes } from './routes/pick.routes';
 import { authRoutes } from './routes/auth.routes';
 import leagueRoutes from './routes/league.routes';
 import predictionsRoutes from './routes/predictions.routes';
+import productsRoutes from './routes/storefront/products.routes';
+import categoriesRoutes from './routes/storefront/categories.routes';
 import { errorHandler } from './utils/errors';
 
 const app = express();
@@ -55,6 +57,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/v1/picks', pickRoutes);
 app.use('/api/v1/leagues', leagueRoutes);
 app.use('/api/v1/predictions', predictionsRoutes);
+app.use('/api/v1/products', productsRoutes);
+app.use('/api/v1/categories', categoriesRoutes);
 app.use('/auth', authRoutes);
 
 // Error handling middleware
